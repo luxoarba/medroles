@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { signIn, signUp } from "@/lib/auth";
@@ -13,6 +13,9 @@ export default function AuthPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  const mountedRef = useRef(true);
+  useEffect(() => () => { mountedRef.current = false; }, []);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -23,10 +26,12 @@ export default function AuthPage() {
         ? await signUp(email, password)
         : await signIn(email, password);
 
+    if (!mountedRef.current) return;
+
     setLoading(false);
 
     if (authError) {
-      setError(authError.message);
+      setError(authError.message ?? "Something went wrong. Please try again.");
       return;
     }
 
@@ -106,7 +111,7 @@ export default function AuthPage() {
 
             {/* Error */}
             {error && (
-              <p className="rounded-lg bg-red-50 px-4 py-2.5 text-sm text-red-600 ring-1 ring-red-100">
+              <p role="alert" className="rounded-lg bg-red-50 px-4 py-2.5 text-sm text-red-600 ring-1 ring-red-100">
                 {error}
               </p>
             )}
