@@ -1,4 +1,5 @@
 import Link from "next/link";
+import NavbarAuth from "./navbar-auth";
 
 export default function Navbar() {
   return (
@@ -45,12 +46,7 @@ export default function Navbar() {
 
         {/* CTAs */}
         <div className="flex items-center gap-2">
-          <Link
-            href="#"
-            className="hidden text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors sm:block px-3 py-2"
-          >
-            Sign in
-          </Link>
+          <NavbarAuth />
           <Link
             href="#"
             className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 transition-colors"
