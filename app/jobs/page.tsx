@@ -1,15 +1,8 @@
 import Link from "next/link";
 import Navbar from "../components/navbar";
 import BookmarkButton from "../components/bookmark-button";
-import {
-  JOBS,
-  SPECIALTIES,
-  GRADES,
-  CONTRACT_TYPES,
-  TRUST_TYPES,
-  SOURCES,
-  type Job,
-} from "../lib/jobs";
+import { supabase, formatSalary, type DBJobListing } from "../lib/supabase";
+import { SPECIALTIES, GRADES, CONTRACT_TYPES, TRUST_TYPES, SOURCES } from "../lib/jobs";
 
 const GRADE_COLOURS: Record<string, string> = {
   FY1: "bg-sky-50 text-sky-700 ring-sky-200",
@@ -46,91 +39,135 @@ function StarRating({ rating }: { rating: number }) {
 }
 
 function daysUntil(dateStr: string) {
-  const today = new Date("2026-04-07");
+  const today = new Date();
   const closing = new Date(dateStr);
   return Math.round((closing.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 }
 
-function JobCard({ job }: { job: Job }) {
-  const days = daysUntil(job.closingDate);
-  const closing = new Date(job.closingDate).toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
+function resolveTrust(raw: DBJobListing["trusts"]) {
+  if (!raw) return null;
+  return Array.isArray(raw) ? (raw[0] ?? null) : raw;
+}
+
+function JobCard({ job }: { job: DBJobListing }) {
+  const trust = resolveTrust(job.trusts);
+  const rating = trust?.avg_rating ?? null;
+  const salary = formatSalary(job.salary_min, job.salary_max);
+  const days = job.closes_at ? daysUntil(job.closes_at) : null;
+  const closing = job.closes_at
+    ? new Date(job.closes_at).toLocaleDateString("en-GB", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      })
+    : null;
+  const grade = job.grade ?? "";
+  // Capitalise contract_type values that come lowercase from DB (e.g. "permanent")
+  const contractLabel = job.contract_type
+    ? job.contract_type.charAt(0).toUpperCase() + job.contract_type.slice(1)
+    : null;
 
   return (
     <Link
       href={`/jobs/${job.id}`}
       className="group relative block rounded-2xl bg-white p-6 ring-1 ring-gray-200 hover:ring-emerald-300 hover:shadow-md transition-all duration-150"
     >
-      {/* Header row */}
+      {/* Header */}
       <div className="mb-3 flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 className="truncate text-[15px] font-semibold text-gray-900 group-hover:text-emerald-700 transition-colors">
             {job.title}
           </h2>
-          <p className="mt-0.5 truncate text-sm text-gray-500">{job.trust}</p>
+          <p className="mt-0.5 truncate text-sm text-gray-500">
+            {trust?.name ?? "NHS Trust"}
+          </p>
         </div>
         <BookmarkButton jobId={job.id} />
       </div>
 
       {/* Tags */}
       <div className="mb-4 flex flex-wrap gap-1.5">
-        <span
-          className={`rounded-md px-2 py-0.5 text-xs font-medium ring-1 ${GRADE_COLOURS[job.grade] ?? "bg-gray-50 text-gray-600 ring-gray-200"}`}
-        >
-          {job.grade}
-        </span>
-        <span className="rounded-md bg-gray-50 px-2 py-0.5 text-xs font-medium text-gray-600 ring-1 ring-gray-200">
-          {job.specialty}
-        </span>
-        <span className="rounded-md bg-gray-50 px-2 py-0.5 text-xs font-medium text-gray-600 ring-1 ring-gray-200">
-          {job.contractType}
-        </span>
-        {job.ltftFriendly && (
+        {grade && (
+          <span
+            className={`rounded-md px-2 py-0.5 text-xs font-medium ring-1 ${
+              GRADE_COLOURS[grade] ?? "bg-gray-50 text-gray-600 ring-gray-200"
+            }`}
+          >
+            {grade}
+          </span>
+        )}
+        {job.specialty && (
+          <span className="rounded-md bg-gray-50 px-2 py-0.5 text-xs font-medium text-gray-600 ring-1 ring-gray-200">
+            {job.specialty}
+          </span>
+        )}
+        {contractLabel && (
+          <span className="rounded-md bg-gray-50 px-2 py-0.5 text-xs font-medium text-gray-600 ring-1 ring-gray-200">
+            {contractLabel}
+          </span>
+        )}
+        {job.training_post && (
           <span className="rounded-md bg-teal-50 px-2 py-0.5 text-xs font-medium text-teal-700 ring-1 ring-teal-200">
-            LTFT ✓
+            Training post
+          </span>
+        )}
+        {job.on_call && (
+          <span className="rounded-md bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 ring-1 ring-amber-200">
+            On-call
           </span>
         )}
       </div>
 
-      {/* Meta row */}
+      {/* Meta */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-gray-500">
-        <span className="flex items-center gap-1">
-          <svg className="h-3.5 w-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0zM19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
-          </svg>
-          {job.region}
-        </span>
-        <span className="flex items-center gap-1">
-          <svg className="h-3.5 w-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75" />
-          </svg>
-          {job.salaryRange}
-        </span>
-        <StarRating rating={job.trustRating} />
+        {job.region && (
+          <span className="flex items-center gap-1">
+            <svg className="h-3.5 w-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0zM19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
+            </svg>
+            {job.region}
+          </span>
+        )}
+        {salary && (
+          <span className="flex items-center gap-1">
+            <svg className="h-3.5 w-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75" />
+            </svg>
+            {salary}
+          </span>
+        )}
+        {rating !== null && <StarRating rating={rating} />}
       </div>
 
       {/* Footer */}
-      <div className="mt-4 flex items-center justify-between border-t border-gray-100 pt-4">
-        <span className={`text-xs font-medium ${days <= 7 ? "text-red-600" : days <= 14 ? "text-amber-600" : "text-gray-400"}`}>
-          {days <= 7 ? "⚠ " : ""}Closes {closing}
-          {days >= 0 ? ` · ${days}d left` : " · Closed"}
-        </span>
-        <span className="text-xs text-gray-400">{job.source}</span>
-      </div>
+      {(closing !== null || job.source) && (
+        <div className="mt-4 flex items-center justify-between border-t border-gray-100 pt-4">
+          {closing !== null && days !== null ? (
+            <span
+              className={`text-xs font-medium ${
+                days <= 7
+                  ? "text-red-600"
+                  : days <= 14
+                    ? "text-amber-600"
+                    : "text-gray-400"
+              }`}
+            >
+              {days <= 7 ? "⚠ " : ""}Closes {closing}
+              {days >= 0 ? ` · ${days}d left` : " · Closed"}
+            </span>
+          ) : (
+            <span />
+          )}
+          {job.source && (
+            <span className="text-xs text-gray-400">{job.source}</span>
+          )}
+        </div>
+      )}
     </Link>
   );
 }
 
-function FilterSection({
-  title,
-  items,
-}: {
-  title: string;
-  items: string[];
-}) {
+function FilterSection({ title, items }: { title: string; items: string[] }) {
   return (
     <div>
       <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-widest text-gray-400">
@@ -140,9 +177,7 @@ function FilterSection({
         {items.map((item) => (
           <li key={item}>
             <label className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors">
-              <span className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded border border-gray-300 bg-white">
-                <span className="hidden h-2 w-2 rounded-sm bg-emerald-600" />
-              </span>
+              <span className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded border border-gray-300 bg-white" />
               {item}
             </label>
           </li>
@@ -152,13 +187,49 @@ function FilterSection({
   );
 }
 
+async function fetchJobs(): Promise<DBJobListing[]> {
+  const { data, error } = await supabase
+    .from("job_listings")
+    .select(`
+      id,
+      title,
+      specialty,
+      grade,
+      contract_type,
+      region,
+      pay_band,
+      salary_min,
+      salary_max,
+      on_call,
+      training_post,
+      closes_at,
+      posted_at,
+      source,
+      external_url,
+      trusts (
+        name,
+        avg_rating,
+        review_count,
+        type
+      )
+    `)
+    .order("closes_at", { ascending: true });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return (data ?? []) as unknown as DBJobListing[];
+}
+
 export default async function JobsPage({
   searchParams,
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
-  await searchParams; // consumed to satisfy Next.js 16 signature
-  const jobs = JOBS;
+  await searchParams;
+
+  const jobs = await fetchJobs();
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -170,9 +241,9 @@ export default async function JobsPage({
           <div>
             <h1 className="text-2xl font-bold text-gray-900">NHS Jobs</h1>
             <p className="mt-1 text-sm text-gray-500">
-              Showing {jobs.length} of{" "}
-              <span className="font-semibold text-emerald-600">6,982</span> live
-              roles
+              Showing{" "}
+              <span className="font-semibold text-emerald-600">{jobs.length}</span>{" "}
+              live {jobs.length === 1 ? "role" : "roles"}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -187,8 +258,8 @@ export default async function JobsPage({
               />
             </label>
             <select className="rounded-xl bg-white px-4 py-2.5 text-sm text-gray-600 ring-1 ring-gray-200 outline-none">
-              <option>Sort: Most recent</option>
-              <option>Closing soonest</option>
+              <option>Sort: Closing soonest</option>
+              <option>Most recent</option>
               <option>Highest rated trust</option>
               <option>Salary: High to low</option>
             </select>
@@ -208,7 +279,6 @@ export default async function JobsPage({
               <FilterSection title="Trust type" items={TRUST_TYPES} />
               <div className="h-px bg-gray-100" />
               <FilterSection title="Source" items={SOURCES} />
-
               <button className="w-full rounded-lg bg-emerald-600 py-2 text-xs font-semibold text-white hover:bg-emerald-700 transition-colors">
                 Apply filters
               </button>
@@ -218,29 +288,27 @@ export default async function JobsPage({
             </div>
           </aside>
 
-          {/* Job cards grid */}
+          {/* Job cards */}
           <main className="min-w-0 flex-1">
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-2">
-              {jobs.map((job) => (
-                <JobCard key={job.id} job={job} />
-              ))}
-            </div>
-
-            {/* Pagination placeholder */}
-            <div className="mt-10 flex items-center justify-center gap-1">
-              {[1, 2, 3, "…", 24].map((p, i) => (
-                <button
-                  key={i}
-                  className={`flex h-9 w-9 items-center justify-center rounded-lg text-sm font-medium transition-colors ${
-                    p === 1
-                      ? "bg-emerald-600 text-white"
-                      : "text-gray-500 hover:bg-gray-100"
-                  }`}
-                >
-                  {p}
-                </button>
-              ))}
-            </div>
+            {jobs.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-24 text-center">
+                <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gray-100">
+                  <svg className="h-7 w-7 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 14.15v4.25c0 1.094-.787 2.036-1.872 2.18-2.087.277-4.216.42-6.378.42s-4.291-.143-6.378-.42c-1.085-.144-1.872-1.086-1.872-2.18v-4.25m16.5 0a2.18 2.18 0 00.75-1.661V8.706c0-1.081-.768-2.015-1.837-2.175a48.114 48.114 0 00-3.413-.387m4.5 8.006c-.194.165-.42.295-.673.38A23.978 23.978 0 0112 15.75c-2.648 0-5.195-.429-7.577-1.22a2.016 2.016 0 01-.673-.38m0 0A2.18 2.18 0 013 12.489V8.706c0-1.081.768-2.015 1.837-2.175a48.111 48.111 0 013.413-.387m7.5 0V5.25A2.25 2.25 0 0013.5 3h-3a2.25 2.25 0 00-2.25 2.25v.894m7.5 0a48.667 48.667 0 00-7.5 0" />
+                  </svg>
+                </div>
+                <h3 className="mb-1 text-base font-semibold text-gray-700">No roles found</h3>
+                <p className="text-sm text-gray-400">
+                  The job_listings table appears to be empty.
+                </p>
+              </div>
+            ) : (
+              <div className="grid gap-4 sm:grid-cols-2">
+                {jobs.map((job) => (
+                  <JobCard key={job.id} job={job} />
+                ))}
+              </div>
+            )}
           </main>
         </div>
       </div>
