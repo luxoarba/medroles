@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import type { User } from "@supabase/supabase-js";
 import Navbar from "../components/navbar";
 import { getUser, signOut } from "@/lib/auth";
@@ -12,18 +13,26 @@ export default function AccountPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let cancelled = false;
     getUser().then((u) => {
+      if (cancelled) return;
       if (!u) {
+        setLoading(false);
         router.push("/auth");
         return;
       }
       setUser(u);
       setLoading(false);
     });
+    return () => { cancelled = true; };
   }, [router]);
 
   async function handleSignOut() {
-    await signOut();
+    try {
+      await signOut();
+    } catch {
+      // sign-out failed; continue to redirect anyway to clear local state
+    }
     router.push("/");
   }
 
@@ -90,9 +99,9 @@ export default function AccountPage() {
             <p className="text-sm font-medium text-gray-400">No saved jobs yet</p>
             <p className="mt-1 text-xs text-gray-400">
               Bookmark roles from the{" "}
-              <a href="/jobs" className="text-emerald-600 hover:underline">
+              <Link href="/jobs" className="text-emerald-600 hover:underline">
                 jobs board
-              </a>
+              </Link>
             </p>
           </div>
         </div>
