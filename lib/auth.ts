@@ -16,3 +16,7 @@ export async function getUser() {
   const { data } = await supabase.auth.getUser();
   return data.user;
 }
+
+export async function resetPassword(email: string) {
+  return supabase.auth.resetPasswordForEmail(email);
+}

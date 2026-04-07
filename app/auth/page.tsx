@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { signIn, signUp } from "@/lib/auth";
+import { signIn, signUp, resetPassword } from "@/lib/auth";
 
 export default function AuthPage() {
   const router = useRouter();
@@ -11,14 +11,34 @@ export default function AuthPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const mountedRef = useRef(true);
   useEffect(() => () => { mountedRef.current = false; }, []);
 
+  async function handleForgotPassword() {
+    if (!email) {
+      setError("Enter your email address above first.");
+      return;
+    }
+    setError(null);
+    setSuccess(null);
+    setLoading(true);
+    const { error: resetError } = await resetPassword(email);
+    if (!mountedRef.current) return;
+    setLoading(false);
+    if (resetError) {
+      setError(resetError.message ?? "Something went wrong. Please try again.");
+    } else {
+      setSuccess("Check your inbox — we've sent a password reset link.");
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setSuccess(null);
     setLoading(true);
 
     const { error: authError } =
@@ -109,10 +129,31 @@ export default function AuthPage() {
               />
             </div>
 
+            {/* Forgot password — login mode only */}
+            {mode === "login" && (
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={handleForgotPassword}
+                  disabled={loading}
+                  className="text-xs text-gray-400 hover:text-emerald-600 transition-colors disabled:opacity-50"
+                >
+                  Forgot password?
+                </button>
+              </div>
+            )}
+
             {/* Error */}
             {error && (
               <p role="alert" className="rounded-lg bg-red-50 px-4 py-2.5 text-sm text-red-600 ring-1 ring-red-100">
                 {error}
+              </p>
+            )}
+
+            {/* Success */}
+            {success && (
+              <p role="status" className="rounded-lg bg-emerald-50 px-4 py-2.5 text-sm text-emerald-700 ring-1 ring-emerald-100">
+                {success}
               </p>
             )}
 
@@ -136,7 +177,7 @@ export default function AuthPage() {
               <>
                 Don&apos;t have an account?{" "}
                 <button
-                  onClick={() => { setMode("signup"); setError(null); }}
+                  onClick={() => { setMode("signup"); setError(null); setSuccess(null); }}
                   className="font-medium text-emerald-600 hover:text-emerald-700 transition-colors"
                 >
                   Sign up
@@ -146,7 +187,7 @@ export default function AuthPage() {
               <>
                 Already have an account?{" "}
                 <button
-                  onClick={() => { setMode("login"); setError(null); }}
+                  onClick={() => { setMode("login"); setError(null); setSuccess(null); }}
                   className="font-medium text-emerald-600 hover:text-emerald-700 transition-colors"
                 >
                   Sign in
