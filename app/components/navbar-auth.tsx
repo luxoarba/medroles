@@ -4,8 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { User } from "@supabase/supabase-js";
-import { supabase } from "@/app/lib/supabase";
-import { signOut } from "@/lib/auth";
+import { signOut, subscribeToAuthChanges } from "@/lib/auth";
 
 export default function NavbarAuth() {
   const router = useRouter();
@@ -13,12 +12,10 @@ export default function NavbarAuth() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setUser(session?.user ?? null);
-        if (event === "INITIAL_SESSION") setLoading(false);
-      }
-    );
+    const subscription = subscribeToAuthChanges((event, session) => {
+      setUser(session?.user ?? null);
+      if (event === "INITIAL_SESSION") setLoading(false);
+    });
 
     return () => subscription.unsubscribe();
   }, []);

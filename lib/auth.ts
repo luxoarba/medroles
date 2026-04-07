@@ -20,3 +20,10 @@ export async function getUser() {
 export async function resetPassword(email: string) {
   return supabase.auth.resetPasswordForEmail(email);
 }
+
+export function subscribeToAuthChanges(
+  callback: (event: import("@supabase/supabase-js").AuthChangeEvent, session: import("@supabase/supabase-js").Session | null) => void
+) {
+  const { data: { subscription } } = supabase.auth.onAuthStateChange(callback);
+  return subscription;
+}
