@@ -190,7 +190,20 @@ function FilterSection({ title, items }: { title: string; items: string[] }) {
   );
 }
 
-async function fetchJobs(sort: string): Promise<DBJobListing[]> {
+function toArray(val: string | string[] | undefined): string[] {
+  if (!val) return [];
+  return Array.isArray(val) ? val : [val];
+}
+
+async function fetchJobs(
+  sort: string,
+  filters: {
+    specialty: string[];
+    grade: string[];
+    contract: string[];
+    source: string[];
+  } = { specialty: [], grade: [], contract: [], source: [] },
+): Promise<DBJobListing[]> {
   let query = supabase
     .from("job_listings")
     .select(`
@@ -216,6 +229,11 @@ async function fetchJobs(sort: string): Promise<DBJobListing[]> {
         type
       )
     `);
+
+  if (filters.specialty.length > 0) query = query.in("specialty", filters.specialty);
+  if (filters.grade.length > 0) query = query.in("grade", filters.grade);
+  if (filters.contract.length > 0) query = query.in("contract_type", filters.contract);
+  if (filters.source.length > 0) query = query.in("source", filters.source);
 
   if (sort === "posted_at") {
     query = query.order("posted_at", { ascending: false });
