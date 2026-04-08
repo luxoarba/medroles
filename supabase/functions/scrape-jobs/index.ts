@@ -5,90 +5,130 @@ const supabase = createClient(
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
 );
 
-const NHS_JOBS_URL = "https://www.jobs.nhs.uk/api/v1/search_jobs";
-const PAGE_SIZE = 20;
-const DELAY_MS = 200;
+const BASE_URL = "https://www.jobs.nhs.uk";
+const SEARCH_PATH = "/candidate/search/results";
+const MAX_PAGES = 15; // 300 jobs per run — stay well within 150s timeout
+const DELAY_MS = 150;
 
-interface NHSJob {
-  vacancyTitle?: string;
-  title?: string;
-  employerName?: string;
-  organisationName?: string;
-  location?: string;
-  locationName?: string;
-  salaryFrom?: number;
-  salaryTo?: number;
-  closingDate?: string;
-  expiryDate?: string;
-  publishedDate?: string;
-  datePosted?: string;
-  vacancyId?: string;
-  id?: string;
-  jobUrl?: string;
-  contractType?: string;
-  contractTypeName?: string;
+interface ParsedJob {
+  vacancyId: string;
+  title: string;
+  trustName: string;
+  location: string | null;
+  salaryText: string | null;
+  closingDateText: string | null;
+  postedDateText: string | null;
+  contractTypeText: string | null;
+  externalUrl: string;
 }
 
-interface NHSJobsResponse {
-  jobs?: NHSJob[];
-  vacancies?: NHSJob[];
-  results?: NHSJob[];
-  totalJobs?: number;
-  totalCount?: number;
-  count?: number;
-  total?: number;
+// --- HTML parsing helpers ---
+
+function extractText(html: string, dataTest: string): string | null {
+  const re = new RegExp(
+    `data-test="${dataTest}"[\\s\\S]*?<strong[^>]*>([\\s\\S]*?)<\\/strong>`,
+    "i",
+  );
+  const m = html.match(re);
+  return m ? m[1].trim().replace(/\s+/g, " ") : null;
 }
 
-function getJobs(res: NHSJobsResponse): NHSJob[] {
-  return res.jobs ?? res.vacancies ?? res.results ?? [];
+function parseJobCards(html: string): ParsedJob[] {
+  const jobs: ParsedJob[] = [];
+
+  // Split into individual job card strings on the opening li tag
+  const cardRegex = /<li[^>]*data-test="search-result"[^>]*>([\s\S]*?)(?=<li[^>]*data-test="search-result"|<\/ul>)/g;
+  let match: RegExpExecArray | null;
+
+  while ((match = cardRegex.exec(html)) !== null) {
+    const card = match[1];
+
+    // Extract vacancy ID and title from the job title link
+    const titleLinkMatch = card.match(
+      /\/candidate\/jobadvert\/([^?"'\s]+)[^>]*data-test="search-result-job-title"[^>]*>\s*([\s\S]*?)\s*<\/a>/,
+    ) ?? card.match(
+      /data-test="search-result-job-title"[^>]*href="\/candidate\/jobadvert\/([^?"'\s]+)[^>]*>\s*([\s\S]*?)\s*<\/a>/,
+    ) ?? card.match(
+      /href="\/candidate\/jobadvert\/([^?"'\s]+)[\s\S]*?data-test="search-result-job-title"[^>]*>\s*([\s\S]*?)\s*<\/a>/,
+    );
+
+    if (!titleLinkMatch) continue;
+
+    const vacancyId = titleLinkMatch[1];
+    const title = titleLinkMatch[2].replace(/\s+/g, " ").trim();
+
+    // Extract trust name: first text node inside <h3> inside [data-test="search-result-location"]
+    const locationBlockMatch = card.match(
+      /data-test="search-result-location"[\s\S]*?<h3[^>]*>\s*([\s\S]*?)<div/,
+    );
+    const trustName = locationBlockMatch
+      ? locationBlockMatch[1].replace(/\s+/g, " ").trim()
+      : "NHS Trust";
+
+    // Extract location text from .location-font-size
+    const locationMatch = card.match(/location-font-size"[^>]*>\s*([\s\S]*?)\s*<\/div>/);
+    const location = locationMatch
+      ? locationMatch[1].replace(/\s+/g, " ").trim() || null
+      : null;
+
+    jobs.push({
+      vacancyId,
+      title,
+      trustName,
+      location,
+      salaryText: extractText(card, "search-result-salary"),
+      closingDateText: extractText(card, "search-result-closingDate"),
+      postedDateText: extractText(card, "search-result-publicationDate"),
+      contractTypeText: extractText(card, "search-result-jobType"),
+      externalUrl: `${BASE_URL}/candidate/jobadvert/${vacancyId}`,
+    });
+  }
+
+  return jobs;
 }
 
-// `count` is third — it may mean "results on this page" on some API versions,
-// so prefer totalJobs/totalCount first.
-function getTotal(res: NHSJobsResponse): number {
-  return res.totalJobs ?? res.totalCount ?? res.count ?? res.total ?? 0;
+function parseTotalPages(html: string): number {
+  const m = html.match(/([\d,]+)\s+jobs?\s+found/i);
+  if (!m) return 1;
+  const total = parseInt(m[1].replace(/,/g, ""), 10);
+  return Math.min(Math.ceil(total / 20), MAX_PAGES);
 }
 
-function getTitle(job: NHSJob): string {
-  return job.vacancyTitle ?? job.title ?? "Untitled role";
+// --- Data transformation helpers ---
+
+const MONTHS: Record<string, string> = {
+  january: "01", february: "02", march: "03", april: "04",
+  may: "05", june: "06", july: "07", august: "08",
+  september: "09", october: "10", november: "11", december: "12",
+};
+
+function parseDate(text: string | null): string | null {
+  if (!text) return null;
+  const m = text.trim().match(/(\d{1,2})\s+(\w+)\s+(\d{4})/);
+  if (!m) return null;
+  const month = MONTHS[m[2].toLowerCase()];
+  if (!month) return null;
+  return `${m[3]}-${month}-${m[1].padStart(2, "0")}`;
 }
 
-function getEmployer(job: NHSJob): string {
-  return job.employerName ?? job.organisationName ?? "NHS Trust";
+function parseSalary(text: string | null): { min: number | null; max: number | null } {
+  if (!text) return { min: null, max: null };
+  // Skip hourly rates — not comparable with annual salary
+  if (/an hour|per hour/i.test(text)) return { min: null, max: null };
+  const nums = [...text.matchAll(/£([\d,]+(?:\.\d+)?)/g)].map(
+    (m) => Math.round(parseFloat(m[1].replace(/,/g, ""))),
+  );
+  if (nums.length === 0) return { min: null, max: null };
+  return { min: nums[0], max: nums[1] ?? nums[0] };
 }
 
-function getLocation(job: NHSJob): string | null {
-  return job.location ?? job.locationName ?? null;
-}
-
-function getSalaryMin(job: NHSJob): number | null {
-  return job.salaryFrom ?? null;
-}
-
-function getSalaryMax(job: NHSJob): number | null {
-  return job.salaryTo ?? null;
-}
-
-function getClosingDate(job: NHSJob): string | null {
-  return job.closingDate ?? job.expiryDate ?? null;
-}
-
-function getPostedDate(job: NHSJob): string | null {
-  return job.publishedDate ?? job.datePosted ?? null;
-}
-
-function getExternalUrl(job: NHSJob): string | null {
-  const id = job.vacancyId ?? job.id;
-  if (id) return `https://www.jobs.nhs.uk/candidate/jobadvert/${id}`;
-  return job.jobUrl ?? null;
-}
-
-function getContractType(job: NHSJob): string | null {
-  const raw = (job.contractType ?? job.contractTypeName ?? "").toLowerCase();
-  if (raw.includes("permanent")) return "Permanent";
-  if (raw.includes("fixed")) return "Fixed Term";
-  if (raw.includes("locum")) return "Locum";
-  if (/\bpart[\s-]?time\b/.test(raw)) return "Part-time";
+function mapContractType(text: string | null): string | null {
+  if (!text) return null;
+  const t = text.toLowerCase();
+  if (t.includes("permanent")) return "Permanent";
+  if (t.includes("fixed")) return "Fixed Term";
+  if (t.includes("locum")) return "Locum";
+  if (/\bpart[\s-]?time\b/.test(t)) return "Part-time";
   return null;
 }
 
@@ -127,95 +167,131 @@ function inferSpecialty(title: string): string | null {
   return null;
 }
 
-async function getOrCreateTrust(name: string): Promise<string | null> {
-  const { data: created } = await supabase
-    .from("trusts")
-    .upsert({ name }, { onConflict: "name", ignoreDuplicates: false })
-    .select("id")
-    .single();
+// --- DB helpers ---
 
-  return created?.id ?? null;
+async function resolveTrusts(
+  names: string[],
+): Promise<Map<string, string>> {
+  const unique = [...new Set(names)];
+  const nameToId = new Map<string, string>();
+
+  // Fetch all existing trusts in one query
+  const { data: existing } = await supabase
+    .from("trusts")
+    .select("id, name")
+    .in("name", unique);
+
+  for (const row of existing ?? []) {
+    nameToId.set(row.name, row.id);
+  }
+
+  // Create missing trusts in one batch upsert
+  const missing = unique.filter((n) => !nameToId.has(n));
+  if (missing.length > 0) {
+    const { data: created } = await supabase
+      .from("trusts")
+      .upsert(
+        missing.map((name) => ({ name })),
+        { onConflict: "name", ignoreDuplicates: false },
+      )
+      .select("id, name");
+
+    for (const row of created ?? []) {
+      nameToId.set(row.name, row.id);
+    }
+  }
+
+  return nameToId;
 }
 
-async function fetchPage(page: number): Promise<NHSJobsResponse> {
-  const url = new URL(NHS_JOBS_URL);
+// --- Fetch ---
+
+async function fetchPage(page: number): Promise<string> {
+  const url = new URL(`${BASE_URL}${SEARCH_PATH}`);
   url.searchParams.set("keyword", "");
   url.searchParams.set("category", "medical-and-dental");
   url.searchParams.set("page", String(page));
-  url.searchParams.set("pageSize", String(PAGE_SIZE));
-  url.searchParams.set("orderBy", "closingDate");
 
   const res = await fetch(url.toString(), {
     headers: {
-      Accept: "application/json",
-      "User-Agent": "MedRoles/1.0 (medroles.co.uk)",
+      "User-Agent":
+        "Mozilla/5.0 (compatible; MedRoles/1.0; +https://medroles.co.uk)",
+      Accept: "text/html",
     },
   });
 
-  if (!res.ok) throw new Error(`NHS Jobs API ${res.status}: ${await res.text()}`);
-  return res.json();
+  if (!res.ok) throw new Error(`NHS Jobs page ${page} returned ${res.status}`);
+  return res.text();
 }
+
+// --- Main ---
 
 Deno.serve(async () => {
   const stats = { upserted: 0, deleted: 0, errors: 0 };
 
   try {
-    const first = await fetchPage(1);
-    const total = getTotal(first);
-    const totalPages = Math.min(Math.ceil(total / PAGE_SIZE), 500);
-    const allJobs: NHSJob[] = [...getJobs(first)];
+    const firstHtml = await fetchPage(1);
+    const totalPages = parseTotalPages(firstHtml);
+    const allParsed: ParsedJob[] = parseJobCards(firstHtml);
 
     for (let page = 2; page <= totalPages; page++) {
       await new Promise((r) => setTimeout(r, DELAY_MS));
-      const data = await fetchPage(page);
-      allJobs.push(...getJobs(data));
-    }
-
-    for (const job of allJobs) {
       try {
-        const externalUrl = getExternalUrl(job);
-        if (!externalUrl) {
-          stats.errors++;
-          continue;
-        }
-
-        const title = getTitle(job);
-        const trustId = await getOrCreateTrust(getEmployer(job));
-
-        const { error } = await supabase.from("job_listings").upsert(
-          {
-            title,
-            trust_id: trustId,
-            region: getLocation(job),
-            grade: inferGrade(title),
-            specialty: inferSpecialty(title),
-            contract_type: getContractType(job),
-            salary_min: getSalaryMin(job),
-            salary_max: getSalaryMax(job),
-            closes_at: getClosingDate(job),
-            posted_at: getPostedDate(job),
-            external_url: externalUrl,
-            source: "NHS Jobs",
-            category: "Medical and Dental",
-            pay_band: null,
-            on_call: null,
-            training_post: null,
-          },
-          { onConflict: "external_url", ignoreDuplicates: false },
-        );
-
-        if (error) {
-          stats.errors++;
-          console.error("upsert error:", error.message);
-        } else {
-          stats.upserted++;
-        }
+        const html = await fetchPage(page);
+        allParsed.push(...parseJobCards(html));
       } catch (e) {
         stats.errors++;
-        console.error("job error:", e);
+        console.error(`page ${page} fetch error:`, e);
       }
     }
 
+    if (allParsed.length === 0) {
+      return new Response(
+        JSON.stringify({ ...stats, warning: "No jobs parsed from HTML" }),
+        { headers: { "Content-Type": "application/json" } },
+      );
+    }
+
+    // Resolve all trusts in two DB calls (not one per job)
+    const trustNames = allParsed.map((j) => j.trustName);
+    const trustMap = await resolveTrusts(trustNames);
+
+    // Build upsert rows
+    const rows = allParsed.map((job) => {
+      const { min, max } = parseSalary(job.salaryText);
+      return {
+        title: job.title,
+        trust_id: trustMap.get(job.trustName) ?? null,
+        region: job.location,
+        grade: inferGrade(job.title),
+        specialty: inferSpecialty(job.title),
+        contract_type: mapContractType(job.contractTypeText),
+        salary_min: min,
+        salary_max: max,
+        closes_at: parseDate(job.closingDateText),
+        posted_at: parseDate(job.postedDateText),
+        external_url: job.externalUrl,
+        source: "NHS Jobs",
+        category: "Medical and Dental",
+        pay_band: null,
+        on_call: null,
+        training_post: null,
+      };
+    });
+
+    // Batch upsert
+    const { error: upsertError } = await supabase
+      .from("job_listings")
+      .upsert(rows, { onConflict: "external_url", ignoreDuplicates: false });
+
+    if (upsertError) {
+      stats.errors++;
+      console.error("batch upsert error:", upsertError.message);
+    } else {
+      stats.upserted = rows.length;
+    }
+
+    // Delete expired jobs from this source only
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - 1);
     const { count } = await supabase
