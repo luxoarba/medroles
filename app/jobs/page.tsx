@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Navbar from "../components/navbar";
 import BookmarkButton from "../components/bookmark-button";
+import RefreshButton from "../components/refresh-button";
 import { supabase, formatSalary, type DBJobListing } from "../lib/supabase";
 import { SPECIALTIES, GRADES, CONTRACT_TYPES, TRUST_TYPES, SOURCES } from "../lib/jobs";
 
@@ -247,6 +248,7 @@ export default async function JobsPage({
             </p>
           </div>
           <div className="flex items-center gap-2">
+            <RefreshButton />
             <label className="flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm text-gray-600 ring-1 ring-gray-200">
               <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
