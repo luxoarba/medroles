@@ -134,8 +134,8 @@ function mapContractType(text: string | null): string | null {
 
 function inferGrade(title: string): string | null {
   const t = title.toLowerCase();
-  if (/\bfy1\b|foundation year 1|foundation doctor 1/.test(t)) return "FY1";
-  if (/\bfy2\b|foundation year 2|foundation doctor 2/.test(t)) return "FY2";
+  if (/\bfy1\b|foundation year 1|foundation doctor 1|resident doctor year 1/.test(t)) return "FY1";
+  if (/\bfy2\b|foundation year 2|foundation doctor 2|resident doctor year 2/.test(t)) return "FY2";
   if (/\bct1\b|core trainee 1|core surgical trainee 1|core medical trainee 1/.test(t)) return "CT1";
   if (/\bct2\b|core trainee 2|core surgical trainee 2|core medical trainee 2/.test(t)) return "CT2";
   if (/\bst3\b|specialty registrar.{0,6}st3/.test(t)) return "ST3";
@@ -155,24 +155,36 @@ function isDoctorRole(title: string): boolean {
   return (
     /\bconsultant\b/.test(t) ||
     /\bregistrar\b/.test(t) ||
-    /\bfy[12]\b|foundation year [12]|foundation doctor/.test(t) ||
-    /\bct[12]\b|core trainee|core surgical trainee|core medical trainee/.test(t) ||
+    // Foundation / FY grades (including new "Resident Doctor" terminology from 2024)
+    /\bfy[12]\b|foundation year [12]|foundation doctor|foundation programme doctor/.test(t) ||
+    /\bresident doctor\b/.test(t) ||
+    /\bjunior doctor\b/.test(t) ||
+    // Core training
+    /\bct[12]\b|core trainee|core surgical trainee|core medical trainee|core training\b/.test(t) ||
+    // Specialty training
     /\bst[3-9]\b|specialty trainee|specialty registrar/.test(t) ||
+    // Internal Medicine Training
+    /\bimt\b|internal medicine trainee/.test(t) ||
+    // SAS grades
     /\bassociate specialist\b/.test(t) ||
     /\bstaff grade\b/.test(t) ||
     /\bspecialty doctor\b/.test(t) ||
-    /\btrust grade doctor\b/.test(t) ||
+    /\bsas doctor\b/.test(t) ||
+    // Trust / locum grades
+    /\btrust grade\b/.test(t) ||
+    /\blocum\b/.test(t) ||
+    // House officer
     /\bsenior house officer\b|\bsho\b/.test(t) ||
     /\bhouse officer\b/.test(t) ||
-    /\bgp\b|\bgeneral practitioner\b/.test(t) ||
+    // GP
+    /\bgp\b|\bgpst\b|\bgeneral practitioner\b/.test(t) ||
+    // Medical officer / fellow
     /\bmedical officer\b/.test(t) ||
     /\bclinical fellow\b/.test(t) ||
     /\bmedical fellow\b/.test(t) ||
-    /\blocum (consultant|registrar|doctor|gp)\b/.test(t) ||
-    /\bdentist\b|\bdental surgeon\b|\bdental officer\b|\bdental practitioner\b/.test(t) ||
-    /\bjunior doctor\b/.test(t) ||
-    /\bsas doctor\b/.test(t) ||
-    /\bphysician\b/.test(t)
+    /\bphysician\b/.test(t) ||
+    // Dental
+    /\bdentist\b|\bdental surgeon\b|\bdental officer\b|\bdental practitioner\b/.test(t)
   );
 }
 
