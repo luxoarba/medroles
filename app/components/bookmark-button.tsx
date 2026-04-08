@@ -43,7 +43,9 @@ export default function BookmarkButton({ jobId }: { jobId: string }) {
 
     try {
       const { error } = prev ? await unsaveJob(jobId) : await saveJob(jobId);
-      if (error) setSaved(prev); // rollback on failure
+      if (error) setSaved(prev); // rollback on Supabase error response
+    } catch {
+      setSaved(prev); // rollback on thrown exception (network error etc.)
     } finally {
       setPending(false);
     }
