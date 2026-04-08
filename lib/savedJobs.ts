@@ -8,7 +8,13 @@ export async function saveJob(jobId: string) {
 }
 
 export async function unsaveJob(jobId: string) {
-  return supabase.from("saved_jobs").delete().eq("job_id", jobId);
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: new Error("Not authenticated") };
+  return supabase
+    .from("saved_jobs")
+    .delete()
+    .eq("job_id", jobId)
+    .eq("user_id", user.id);
 }
 
 export async function isJobSaved(jobId: string): Promise<boolean> {
@@ -21,14 +27,16 @@ export async function isJobSaved(jobId: string): Promise<boolean> {
 }
 
 export async function getSavedJobs(): Promise<DBJobListing[]> {
-  const { data: savedRows } = await supabase
+  const { data: savedRows, error: savedError } = await supabase
     .from("saved_jobs")
     .select("job_id");
+
+  if (savedError) return [];
 
   const jobIds = (savedRows ?? []).map((r: { job_id: string }) => r.job_id);
   if (jobIds.length === 0) return [];
 
-  const { data } = await supabase
+  const { data, error: jobsError } = await supabase
     .from("job_listings")
     .select(`
       id,
@@ -55,5 +63,8 @@ export async function getSavedJobs(): Promise<DBJobListing[]> {
     `)
     .in("id", jobIds);
 
+  if (jobsError) return [];
+
+  // Cast needed: Supabase v2 return type doesn't align with hand-written DBJobListing
   return (data ?? []) as unknown as DBJobListing[];
 }
