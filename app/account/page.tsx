@@ -34,7 +34,7 @@ function SavedJobCard({ job }: { job: DBJobListing }) {
     >
       <div className="min-w-0">
         <p className="truncate text-sm font-semibold text-gray-900 group-hover:text-emerald-700 transition-colors">
-          {job.title}
+          {job.title ?? "Untitled role"}
         </p>
         <p className="mt-0.5 truncate text-xs text-gray-500">
           {trust?.name ?? "NHS Trust"}
