@@ -29,6 +29,5 @@ export function subscribeToAuthChanges(
 }
 
 export async function isLoggedIn(): Promise<boolean> {
-  const { data } = await supabase.auth.getSession();
-  return !!data.session;
+  return !!(await getUser());
 }

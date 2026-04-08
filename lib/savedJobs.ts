@@ -18,10 +18,13 @@ export async function unsaveJob(jobId: string) {
 }
 
 export async function isJobSaved(jobId: string): Promise<boolean> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return false;
   const { data } = await supabase
     .from("saved_jobs")
     .select("id")
     .eq("job_id", jobId)
+    .eq("user_id", user.id)
     .maybeSingle();
   return !!data;
 }
