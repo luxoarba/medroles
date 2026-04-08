@@ -134,17 +134,46 @@ function mapContractType(text: string | null): string | null {
 
 function inferGrade(title: string): string | null {
   const t = title.toLowerCase();
-  if (/\bfy1\b|foundation year 1/.test(t)) return "FY1";
-  if (/\bfy2\b|foundation year 2/.test(t)) return "FY2";
-  if (/\bct1\b|core trainee 1/.test(t)) return "CT1";
-  if (/\bct2\b|core trainee 2/.test(t)) return "CT2";
-  if (/\bst3\b/.test(t)) return "ST3";
-  if (/\bst4\b/.test(t)) return "ST4";
-  if (/\bst5\b/.test(t)) return "ST5";
-  if (/\bst6\b/.test(t)) return "ST6";
-  if (/\bsas\b|associate specialist|staff grade/.test(t)) return "SAS";
+  if (/\bfy1\b|foundation year 1|foundation doctor 1/.test(t)) return "FY1";
+  if (/\bfy2\b|foundation year 2|foundation doctor 2/.test(t)) return "FY2";
+  if (/\bct1\b|core trainee 1|core surgical trainee 1|core medical trainee 1/.test(t)) return "CT1";
+  if (/\bct2\b|core trainee 2|core surgical trainee 2|core medical trainee 2/.test(t)) return "CT2";
+  if (/\bst3\b|specialty registrar.{0,6}st3/.test(t)) return "ST3";
+  if (/\bst4\b|specialty registrar.{0,6}st4/.test(t)) return "ST4";
+  if (/\bst5\b|specialty registrar.{0,6}st5/.test(t)) return "ST5";
+  if (/\bst6\b|specialty registrar.{0,6}st6/.test(t)) return "ST6";
+  if (/\bst7\b/.test(t)) return "ST6"; // map ST7+ to ST6 display
+  if (/\bst8\b/.test(t)) return "ST6";
+  if (/\bsas\b|associate specialist|staff grade|specialty doctor|specialty grade doctor|trust grade doctor/.test(t)) return "SAS";
   if (/\bconsultant\b/.test(t)) return "Consultant";
   return null;
+}
+
+// Broad filter: is this a role that requires a medical degree (GMC/GDC registration)?
+function isDoctorRole(title: string): boolean {
+  const t = title.toLowerCase();
+  return (
+    /\bconsultant\b/.test(t) ||
+    /\bregistrar\b/.test(t) ||
+    /\bfy[12]\b|foundation year [12]|foundation doctor/.test(t) ||
+    /\bct[12]\b|core trainee|core surgical trainee|core medical trainee/.test(t) ||
+    /\bst[3-9]\b|specialty trainee|specialty registrar/.test(t) ||
+    /\bassociate specialist\b/.test(t) ||
+    /\bstaff grade\b/.test(t) ||
+    /\bspecialty doctor\b/.test(t) ||
+    /\btrust grade doctor\b/.test(t) ||
+    /\bsenior house officer\b|\bsho\b/.test(t) ||
+    /\bhouse officer\b/.test(t) ||
+    /\bgp\b|\bgeneral practitioner\b/.test(t) ||
+    /\bmedical officer\b/.test(t) ||
+    /\bclinical fellow\b/.test(t) ||
+    /\bmedical fellow\b/.test(t) ||
+    /\blocum (consultant|registrar|doctor|gp)\b/.test(t) ||
+    /\bdentist\b|\bdental surgeon\b|\bdental officer\b|\bdental practitioner\b/.test(t) ||
+    /\bjunior doctor\b/.test(t) ||
+    /\bsas doctor\b/.test(t) ||
+    /\bphysician\b/.test(t)
+  );
 }
 
 const SPECIALTIES: [RegExp, string][] = [
@@ -260,12 +289,15 @@ Deno.serve(async () => {
       );
     }
 
+    // Filter to doctor/dentist roles only
+    const doctorJobs = unique.filter((j) => isDoctorRole(j.title));
+
     // Resolve all trusts in two DB calls (not one per job)
-    const trustNames = unique.map((j) => j.trustName);
+    const trustNames = doctorJobs.map((j) => j.trustName);
     const trustMap = await resolveTrusts(trustNames);
 
     // Build upsert rows
-    const rows = unique.map((job) => {
+    const rows = doctorJobs.map((job) => {
       const { min, max } = parseSalary(job.salaryText);
       return {
         title: job.title,
