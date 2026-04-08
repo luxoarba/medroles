@@ -276,6 +276,8 @@ Deno.serve(async () => {
         pay_band: null,
         on_call: null,
         training_post: null,
+        is_active: true,
+        cesr_support: false,
       };
     });
 
