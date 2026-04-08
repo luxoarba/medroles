@@ -1,16 +1,38 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { getUser } from "@/lib/auth";
+import { isJobSaved, saveJob, unsaveJob } from "@/lib/savedJobs";
 
 export default function BookmarkButton({ jobId }: { jobId: string }) {
+  const router = useRouter();
   const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    isJobSaved(jobId).then((result) => {
+      if (!cancelled) setSaved(result);
+    });
+    return () => { cancelled = true; };
+  }, [jobId]);
+
+  async function handleClick(e: React.MouseEvent) {
+    e.preventDefault();
+    const user = await getUser();
+    if (!user) {
+      router.push("/auth");
+      return;
+    }
+    const prev = saved;
+    setSaved(!prev); // optimistic
+    const { error } = prev ? await unsaveJob(jobId) : await saveJob(jobId);
+    if (error) setSaved(prev); // rollback on failure
+  }
 
   return (
     <button
-      onClick={(e) => {
-        e.preventDefault();
-        setSaved((s) => !s);
-      }}
+      onClick={handleClick}
       aria-label={saved ? "Remove bookmark" : "Save job"}
       className={`flex h-8 w-8 items-center justify-center rounded-lg border transition-all ${
         saved
