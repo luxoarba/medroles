@@ -27,3 +27,8 @@ export function subscribeToAuthChanges(
   const { data: { subscription } } = supabase.auth.onAuthStateChange(callback);
   return subscription;
 }
+
+export async function isLoggedIn(): Promise<boolean> {
+  const { data } = await supabase.auth.getSession();
+  return !!data.session;
+}

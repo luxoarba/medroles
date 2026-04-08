@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/app/lib/supabase";
+import { isLoggedIn } from "@/lib/auth";
 import { isJobSaved, saveJob, unsaveJob } from "@/lib/savedJobs";
 
 export default function BookmarkButton({ jobId }: { jobId: string }) {
@@ -11,14 +11,13 @@ export default function BookmarkButton({ jobId }: { jobId: string }) {
   const [saved, setSaved] = useState(false);
   const [pending, setPending] = useState(false);
   const isLoggedInRef = useRef(false);
+  const authReadyRef = useRef<Promise<void>>(Promise.resolve());
 
   useEffect(() => {
     let cancelled = false;
 
-    // getSession reads from local storage — no network round-trip
-    supabase.auth.getSession().then(({ data }) => {
-      if (cancelled) return;
-      isLoggedInRef.current = !!data.session;
+    authReadyRef.current = isLoggedIn().then((result) => {
+      if (!cancelled) isLoggedInRef.current = result;
     });
 
     isJobSaved(jobId).then((result) => {
@@ -32,6 +31,7 @@ export default function BookmarkButton({ jobId }: { jobId: string }) {
     e.preventDefault();
     if (pending) return;
 
+    await authReadyRef.current;
     if (!isLoggedInRef.current) {
       router.push("/auth");
       return;
@@ -41,10 +41,12 @@ export default function BookmarkButton({ jobId }: { jobId: string }) {
     setSaved(!prev); // optimistic
     setPending(true);
 
-    const { error } = prev ? await unsaveJob(jobId) : await saveJob(jobId);
-
-    if (error) setSaved(prev); // rollback on failure
-    setPending(false);
+    try {
+      const { error } = prev ? await unsaveJob(jobId) : await saveJob(jobId);
+      if (error) setSaved(prev); // rollback on failure
+    } finally {
+      setPending(false);
+    }
   }
 
   return (
