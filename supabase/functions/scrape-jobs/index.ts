@@ -245,7 +245,15 @@ Deno.serve(async () => {
       }
     }
 
-    if (allParsed.length === 0) {
+    // Deduplicate by vacancyId — NHS Jobs sometimes returns the same job on multiple pages
+    const seen = new Set<string>();
+    const unique = allParsed.filter((j) => {
+      if (seen.has(j.vacancyId)) return false;
+      seen.add(j.vacancyId);
+      return true;
+    });
+
+    if (unique.length === 0) {
       return new Response(
         JSON.stringify({ ...stats, warning: "No jobs parsed from HTML" }),
         { headers: { "Content-Type": "application/json" } },
@@ -253,11 +261,11 @@ Deno.serve(async () => {
     }
 
     // Resolve all trusts in two DB calls (not one per job)
-    const trustNames = allParsed.map((j) => j.trustName);
+    const trustNames = unique.map((j) => j.trustName);
     const trustMap = await resolveTrusts(trustNames);
 
     // Build upsert rows
-    const rows = allParsed.map((job) => {
+    const rows = unique.map((job) => {
       const { min, max } = parseSalary(job.salaryText);
       return {
         title: job.title,
