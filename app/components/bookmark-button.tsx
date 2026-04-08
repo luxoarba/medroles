@@ -1,40 +1,58 @@
+// app/components/bookmark-button.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { getUser } from "@/lib/auth";
+import { supabase } from "@/app/lib/supabase";
 import { isJobSaved, saveJob, unsaveJob } from "@/lib/savedJobs";
 
 export default function BookmarkButton({ jobId }: { jobId: string }) {
   const router = useRouter();
   const [saved, setSaved] = useState(false);
+  const [pending, setPending] = useState(false);
+  const isLoggedInRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
+
+    // getSession reads from local storage — no network round-trip
+    supabase.auth.getSession().then(({ data }) => {
+      if (cancelled) return;
+      isLoggedInRef.current = !!data.session;
+    });
+
     isJobSaved(jobId).then((result) => {
       if (!cancelled) setSaved(result);
     });
+
     return () => { cancelled = true; };
   }, [jobId]);
 
   async function handleClick(e: React.MouseEvent) {
     e.preventDefault();
-    const user = await getUser();
-    if (!user) {
+    if (pending) return;
+
+    if (!isLoggedInRef.current) {
       router.push("/auth");
       return;
     }
+
     const prev = saved;
     setSaved(!prev); // optimistic
+    setPending(true);
+
     const { error } = prev ? await unsaveJob(jobId) : await saveJob(jobId);
+
     if (error) setSaved(prev); // rollback on failure
+    setPending(false);
   }
 
   return (
     <button
       onClick={handleClick}
+      disabled={pending}
       aria-label={saved ? "Remove bookmark" : "Save job"}
-      className={`flex h-8 w-8 items-center justify-center rounded-lg border transition-all ${
+      className={`flex h-8 w-8 items-center justify-center rounded-lg border transition-all disabled:opacity-50 ${
         saved
           ? "border-emerald-200 bg-emerald-50 text-emerald-600"
           : "border-gray-200 bg-white text-gray-400 hover:border-emerald-200 hover:text-emerald-600"
