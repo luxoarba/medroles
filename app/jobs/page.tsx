@@ -1,7 +1,9 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import Navbar from "../components/navbar";
 import BookmarkButton from "../components/bookmark-button";
 import RefreshButton from "../components/refresh-button";
+import SortSelect from "../components/sort-select";
 import { supabase, formatSalary, type DBJobListing } from "../lib/supabase";
 import { SPECIALTIES, GRADES, CONTRACT_TYPES, TRUST_TYPES, SOURCES } from "../lib/jobs";
 
@@ -188,8 +190,8 @@ function FilterSection({ title, items }: { title: string; items: string[] }) {
   );
 }
 
-async function fetchJobs(): Promise<DBJobListing[]> {
-  const { data, error } = await supabase
+async function fetchJobs(sort: string): Promise<DBJobListing[]> {
+  let query = supabase
     .from("job_listings")
     .select(`
       id,
@@ -213,8 +215,17 @@ async function fetchJobs(): Promise<DBJobListing[]> {
         review_count,
         type
       )
-    `)
-    .order("closes_at", { ascending: true });
+    `);
+
+  if (sort === "posted_at") {
+    query = query.order("posted_at", { ascending: false });
+  } else if (sort === "salary") {
+    query = query.order("salary_max", { ascending: false, nullsFirst: false });
+  } else {
+    query = query.order("closes_at", { ascending: true });
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     throw new Error(error.message);
@@ -228,9 +239,10 @@ export default async function JobsPage({
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
-  await searchParams;
+  const { sort = "closes_at" } = await searchParams;
+  const sortValue = Array.isArray(sort) ? sort[0] : sort;
 
-  const jobs = await fetchJobs();
+  const jobs = await fetchJobs(sortValue);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -259,12 +271,9 @@ export default async function JobsPage({
                 className="w-48 bg-transparent outline-none placeholder-gray-400"
               />
             </label>
-            <select className="rounded-xl bg-white px-4 py-2.5 text-sm text-gray-600 ring-1 ring-gray-200 outline-none">
-              <option>Sort: Closing soonest</option>
-              <option>Most recent</option>
-              <option>Highest rated trust</option>
-              <option>Salary: High to low</option>
-            </select>
+            <Suspense fallback={<div className="rounded-xl bg-white px-4 py-2.5 text-sm text-gray-300 ring-1 ring-gray-200">Sort…</div>}>
+              <SortSelect />
+            </Suspense>
           </div>
         </div>
 
