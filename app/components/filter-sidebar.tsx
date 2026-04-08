@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { SPECIALTIES, GRADES, CONTRACT_TYPES, SOURCES } from "../lib/jobs";
 
 function FilterSection({
@@ -63,6 +63,15 @@ export default function FilterSidebar() {
     contract: searchParams.getAll("contract"),
     source: searchParams.getAll("source"),
   }));
+
+  useEffect(() => {
+    setPending({
+      specialty: searchParams.getAll("specialty"),
+      grade: searchParams.getAll("grade"),
+      contract: searchParams.getAll("contract"),
+      source: searchParams.getAll("source"),
+    });
+  }, [searchParams]);
 
   function toggle(key: string, value: string) {
     setPending((prev) => {
@@ -126,6 +135,7 @@ export default function FilterSidebar() {
         onToggle={(v) => toggle("source", v)}
       />
       <button
+        type="button"
         onClick={apply}
         className="w-full rounded-lg bg-emerald-600 py-2 text-xs font-semibold text-white hover:bg-emerald-700 transition-colors"
       >
@@ -133,6 +143,7 @@ export default function FilterSidebar() {
       </button>
       {hasActive && (
         <button
+          type="button"
           onClick={clearAll}
           className="w-full rounded-lg py-1.5 text-xs font-medium text-gray-400 hover:text-gray-600 transition-colors"
         >
