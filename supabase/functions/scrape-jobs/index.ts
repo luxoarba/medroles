@@ -43,6 +43,8 @@ function getJobs(res: NHSJobsResponse): NHSJob[] {
   return res.jobs ?? res.vacancies ?? res.results ?? [];
 }
 
+// `count` is third — it may mean "results on this page" on some API versions,
+// so prefer totalJobs/totalCount first.
 function getTotal(res: NHSJobsResponse): number {
   return res.totalJobs ?? res.totalCount ?? res.count ?? res.total ?? 0;
 }
@@ -86,7 +88,7 @@ function getContractType(job: NHSJob): string | null {
   if (raw.includes("permanent")) return "Permanent";
   if (raw.includes("fixed")) return "Fixed Term";
   if (raw.includes("locum")) return "Locum";
-  if (raw.includes("part")) return "Part-time";
+  if (/\bpart[\s-]?time\b/.test(raw)) return "Part-time";
   return null;
 }
 
@@ -126,17 +128,9 @@ function inferSpecialty(title: string): string | null {
 }
 
 async function getOrCreateTrust(name: string): Promise<string | null> {
-  const { data: existing } = await supabase
-    .from("trusts")
-    .select("id")
-    .eq("name", name)
-    .maybeSingle();
-
-  if (existing) return existing.id;
-
   const { data: created } = await supabase
     .from("trusts")
-    .insert({ name })
+    .upsert({ name }, { onConflict: "name", ignoreDuplicates: false })
     .select("id")
     .single();
 
@@ -163,12 +157,12 @@ async function fetchPage(page: number): Promise<NHSJobsResponse> {
 }
 
 Deno.serve(async () => {
-  const stats = { inserted: 0, deleted: 0, errors: 0 };
+  const stats = { upserted: 0, deleted: 0, errors: 0 };
 
   try {
     const first = await fetchPage(1);
     const total = getTotal(first);
-    const totalPages = Math.ceil(total / PAGE_SIZE);
+    const totalPages = Math.min(Math.ceil(total / PAGE_SIZE), 500);
     const allJobs: NHSJob[] = [...getJobs(first)];
 
     for (let page = 2; page <= totalPages; page++) {
@@ -214,7 +208,7 @@ Deno.serve(async () => {
           stats.errors++;
           console.error("upsert error:", error.message);
         } else {
-          stats.inserted++;
+          stats.upserted++;
         }
       } catch (e) {
         stats.errors++;
@@ -222,11 +216,13 @@ Deno.serve(async () => {
       }
     }
 
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 1);
     const { count } = await supabase
       .from("job_listings")
       .delete({ count: "exact" })
       .eq("category", "Medical and Dental")
-      .lt("closes_at", new Date().toISOString());
+      .lt("closes_at", cutoff.toISOString().slice(0, 10));
 
     stats.deleted = count ?? 0;
   } catch (e) {
