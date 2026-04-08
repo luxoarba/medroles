@@ -375,4 +375,4 @@ export const CONTRACT_TYPES = ["Permanent", "Fixed Term", "Locum", "Part-time"];
 
 export const TRUST_TYPES = ["Acute", "Mental Health", "Community", "Teaching", "Foundation"];
 
-export const SOURCES = ["NHS Jobs", "Trust Website", "BMJ Careers"];
+export const SOURCES = ["NHS Jobs", "Trac Jobs"];
