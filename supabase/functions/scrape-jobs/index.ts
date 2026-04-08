@@ -7,7 +7,7 @@ const supabase = createClient(
 
 const BASE_URL = "https://www.jobs.nhs.uk";
 const SEARCH_PATH = "/candidate/search/results";
-const MAX_PAGES = 15; // 300 jobs per run — stay well within 150s timeout
+const MAX_PAGES = 50; // 1000 jobs fetched → ~100–200 doctor roles per run
 const DELAY_MS = 150;
 
 interface ParsedJob {
