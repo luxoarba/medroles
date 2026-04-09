@@ -25,6 +25,9 @@ export type DBJobListing = {
     | { name: string; avg_rating: number | null; review_count: number | null; type: string | null }
     | { name: string; avg_rating: number | null; review_count: number | null; type: string | null }[]
     | null;
+  description: string | null;
+  requirements: string[] | null;
+  benefits: string[] | null;
 };
 
 export function formatSalary(min: number | null, max: number | null): string | null {

@@ -22,6 +22,14 @@ interface ParsedJob {
   externalUrl: string;
 }
 
+interface NhsJobDetail {
+  description: string | null;
+  requirements: string[] | null;
+  benefits: string[] | null;
+}
+
+const DETAIL_CONCURRENCY = 5;
+
 // --- HTML parsing helpers ---
 
 function extractText(html: string, dataTest: string): string | null {
@@ -92,6 +100,77 @@ function parseTotalPages(html: string): number {
   if (!m) return 1;
   const total = parseInt(m[1].replace(/,/g, ""), 10);
   return Math.min(Math.ceil(total / 20), MAX_PAGES);
+}
+
+// --- Detail page parsing ---
+
+function extractSection(html: string, heading: string): string | null {
+  const re = new RegExp(
+    `${heading}[^<]*<\\/h[2-6]>([\\s\\S]*?)(?=<h[2-6]|<\\/section|<\\/article|$)`,
+    "i",
+  );
+  const m = html.match(re);
+  return m
+    ? m[1]
+        .replace(/<[^>]+>/g, " ")
+        .replace(/&amp;/g, "&")
+        .replace(/&nbsp;/g, " ")
+        .replace(/&#\d+;/g, "")
+        .replace(/\s+/g, " ")
+        .trim() || null
+    : null;
+}
+
+function extractListItems(html: string, heading: string): string[] | null {
+  const re = new RegExp(
+    `${heading}[\\s\\S]{0,400}<ul[^>]*>([\\s\\S]*?)<\\/ul>`,
+    "i",
+  );
+  const m = html.match(re);
+  if (!m) return null;
+  const items = [...m[1].matchAll(/<li[^>]*>([\s\S]*?)<\/li>/gi)]
+    .map((li) =>
+      li[1]
+        .replace(/<[^>]+>/g, "")
+        .replace(/&amp;/g, "&")
+        .replace(/&nbsp;/g, " ")
+        .replace(/&#\d+;/g, "")
+        .replace(/\s+/g, " ")
+        .trim()
+    )
+    .filter(Boolean);
+  return items.length > 0 ? items : null;
+}
+
+function parseNhsJobsDetail(html: string): NhsJobDetail {
+  const description =
+    extractSection(html, "Detailed job description and main responsibilities") ??
+    extractSection(html, "Job overview") ??
+    extractSection(html, "About the role");
+
+  const requirements =
+    extractListItems(html, "Essential criteria") ??
+    extractListItems(html, "Person specification");
+
+  const benefits =
+    extractListItems(html, "(?:benefits|what we offer|employee benefits)");
+
+  return { description, requirements, benefits };
+}
+
+async function fetchNhsDetail(url: string): Promise<NhsJobDetail | null> {
+  try {
+    const res = await fetch(url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (compatible; MedRoles/1.0; +https://medroles.co.uk)",
+        Accept: "text/html",
+      },
+    });
+    if (!res.ok) return null;
+    return parseNhsJobsDetail(await res.text());
+  } catch {
+    return null;
+  }
 }
 
 // --- Data transformation helpers ---
@@ -343,6 +422,38 @@ Deno.serve(async () => {
       console.error("batch upsert error:", upsertError.message);
     } else {
       stats.upserted = rows.length;
+    }
+
+    // Fetch detail pages for NHS Jobs records missing description
+    const { data: nullDescJobs } = await supabase
+      .from("job_listings")
+      .select("id, external_url")
+      .eq("source", "NHS Jobs")
+      .is("description", null)
+      .not("external_url", "is", null)
+      .limit(100);
+
+    if (nullDescJobs && nullDescJobs.length > 0) {
+      for (let i = 0; i < nullDescJobs.length; i += DETAIL_CONCURRENCY) {
+        const batch = nullDescJobs.slice(i, i + DETAIL_CONCURRENCY);
+        await Promise.all(
+          batch.map(async (job: { id: string; external_url: string }) => {
+            const detail = await fetchNhsDetail(job.external_url);
+            if (!detail || (!detail.description && !detail.requirements && !detail.benefits)) return;
+            await supabase
+              .from("job_listings")
+              .update({
+                description: detail.description,
+                requirements: detail.requirements,
+                benefits: detail.benefits,
+              })
+              .eq("id", job.id);
+          }),
+        );
+        if (i + DETAIL_CONCURRENCY < nullDescJobs.length) {
+          await new Promise((r) => setTimeout(r, DELAY_MS));
+        }
+      }
     }
 
     // Delete expired jobs from this source only

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import Navbar from "../../components/navbar";
 import BookmarkButton from "../../components/bookmark-button";
-import { getJob } from "../../lib/jobs";
+import { supabase, formatSalary, type DBJobListing } from "../../lib/supabase";
 
 function StarRating({
   rating,
@@ -55,22 +55,31 @@ export default async function JobDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const job = getJob(id);
+
+  const { data: job } = await supabase
+    .from("job_listings")
+    .select("*, trusts(name, avg_rating, review_count, type)")
+    .eq("id", id)
+    .single<DBJobListing>();
 
   if (!job) notFound();
 
-  const closing = new Date(job.closingDate).toLocaleDateString("en-GB", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
+  const trust = Array.isArray(job.trusts) ? job.trusts[0] : job.trusts;
 
-  const today = new Date("2026-04-07");
-  const closingDate = new Date(job.closingDate);
-  const daysLeft = Math.round(
-    (closingDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
-  );
+  const closing = job.closes_at
+    ? new Date(job.closes_at).toLocaleDateString("en-GB", {
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      })
+    : null;
+
+  const daysLeft = job.closes_at
+    ? Math.round(
+        (new Date(job.closes_at).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+      )
+    : null;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -100,27 +109,28 @@ export default async function JobDetailPage({
               <div className="mb-5 flex items-start justify-between gap-4">
                 <div className="min-w-0">
                   <div className="mb-3 flex flex-wrap gap-1.5">
-                    <span
-                      className={`rounded-md px-2.5 py-1 text-xs font-semibold ring-1 ${GRADE_COLOURS[job.grade] ?? "bg-gray-50 text-gray-600 ring-gray-200"}`}
-                    >
-                      {job.grade}
-                    </span>
-                    <span className="rounded-md bg-gray-50 px-2.5 py-1 text-xs font-semibold text-gray-600 ring-1 ring-gray-200">
-                      {job.specialty}
-                    </span>
-                    <span className="rounded-md bg-gray-50 px-2.5 py-1 text-xs font-semibold text-gray-600 ring-1 ring-gray-200">
-                      {job.contractType}
-                    </span>
-                    {job.ltftFriendly && (
-                      <span className="rounded-md bg-teal-50 px-2.5 py-1 text-xs font-semibold text-teal-700 ring-1 ring-teal-200">
-                        LTFT friendly
+                    {job.grade && (
+                      <span
+                        className={`rounded-md px-2.5 py-1 text-xs font-semibold ring-1 ${GRADE_COLOURS[job.grade] ?? "bg-gray-50 text-gray-600 ring-gray-200"}`}
+                      >
+                        {job.grade}
+                      </span>
+                    )}
+                    {job.specialty && (
+                      <span className="rounded-md bg-gray-50 px-2.5 py-1 text-xs font-semibold text-gray-600 ring-1 ring-gray-200">
+                        {job.specialty}
+                      </span>
+                    )}
+                    {job.contract_type && (
+                      <span className="rounded-md bg-gray-50 px-2.5 py-1 text-xs font-semibold text-gray-600 ring-1 ring-gray-200">
+                        {job.contract_type}
                       </span>
                     )}
                   </div>
                   <h1 className="mb-1 text-2xl font-bold text-gray-900">
                     {job.title}
                   </h1>
-                  <p className="text-base text-gray-500">{job.trust}</p>
+                  <p className="text-base text-gray-500">{trust?.name}</p>
                   <p className="mt-1 text-sm text-gray-400">{job.region}</p>
                 </div>
                 <BookmarkButton jobId={job.id} />
@@ -133,7 +143,7 @@ export default async function JobDetailPage({
                     Salary
                   </p>
                   <p className="mt-1 text-sm font-semibold text-gray-800">
-                    {job.salaryRange}
+                    {formatSalary(job.salary_min, job.salary_max) ?? "—"}
                   </p>
                 </div>
                 <div>
@@ -141,7 +151,7 @@ export default async function JobDetailPage({
                     On-call
                   </p>
                   <p className="mt-1 text-sm font-semibold text-gray-800">
-                    {job.onCallFrequency}
+                    {job.on_call === null ? "—" : job.on_call ? "Yes" : "No"}
                   </p>
                 </div>
                 <div>
@@ -149,7 +159,7 @@ export default async function JobDetailPage({
                     Trust type
                   </p>
                   <p className="mt-1 text-sm font-semibold text-gray-800">
-                    {job.trustType}
+                    {trust?.type ?? "—"}
                   </p>
                 </div>
                 <div>
@@ -164,50 +174,56 @@ export default async function JobDetailPage({
             </div>
 
             {/* Description */}
-            <div className="mb-6 rounded-2xl bg-white p-8 ring-1 ring-gray-200">
-              <h2 className="mb-4 text-base font-semibold text-gray-900">
-                About the role
-              </h2>
-              <p className="leading-7 text-gray-600">{job.description}</p>
-            </div>
+            {job.description && (
+              <div className="mb-6 rounded-2xl bg-white p-8 ring-1 ring-gray-200">
+                <h2 className="mb-4 text-base font-semibold text-gray-900">
+                  About the role
+                </h2>
+                <p className="leading-7 text-gray-600">{job.description}</p>
+              </div>
+            )}
 
             {/* Requirements */}
-            <div className="mb-6 rounded-2xl bg-white p-8 ring-1 ring-gray-200">
-              <h2 className="mb-4 text-base font-semibold text-gray-900">
-                Requirements
-              </h2>
-              <ul className="space-y-3">
-                {job.requirements.map((req, i) => (
-                  <li key={i} className="flex items-start gap-3 text-sm text-gray-600">
-                    <span className="mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-emerald-100">
-                      <svg className="h-3 w-3 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                      </svg>
-                    </span>
-                    {req}
-                  </li>
-                ))}
-              </ul>
-            </div>
+            {job.requirements && job.requirements.length > 0 && (
+              <div className="mb-6 rounded-2xl bg-white p-8 ring-1 ring-gray-200">
+                <h2 className="mb-4 text-base font-semibold text-gray-900">
+                  Requirements
+                </h2>
+                <ul className="space-y-3">
+                  {job.requirements.map((req, i) => (
+                    <li key={i} className="flex items-start gap-3 text-sm text-gray-600">
+                      <span className="mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-emerald-100">
+                        <svg className="h-3 w-3 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                        </svg>
+                      </span>
+                      {req}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             {/* Benefits */}
-            <div className="rounded-2xl bg-white p-8 ring-1 ring-gray-200">
-              <h2 className="mb-4 text-base font-semibold text-gray-900">
-                Benefits
-              </h2>
-              <ul className="space-y-3">
-                {job.benefits.map((ben, i) => (
-                  <li key={i} className="flex items-start gap-3 text-sm text-gray-600">
-                    <span className="mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-gray-100">
-                      <svg className="h-3 w-3 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                      </svg>
-                    </span>
-                    {ben}
-                  </li>
-                ))}
-              </ul>
-            </div>
+            {job.benefits && job.benefits.length > 0 && (
+              <div className="rounded-2xl bg-white p-8 ring-1 ring-gray-200">
+                <h2 className="mb-4 text-base font-semibold text-gray-900">
+                  Benefits
+                </h2>
+                <ul className="space-y-3">
+                  {job.benefits.map((ben, i) => (
+                    <li key={i} className="flex items-start gap-3 text-sm text-gray-600">
+                      <span className="mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-gray-100">
+                        <svg className="h-3 w-3 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                        </svg>
+                      </span>
+                      {ben}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </article>
 
           {/* Sidebar */}
@@ -215,27 +231,29 @@ export default async function JobDetailPage({
             <div className="sticky top-20 space-y-5">
               {/* Apply card */}
               <div className="rounded-2xl bg-white p-6 ring-1 ring-gray-200">
-                <div
-                  className={`mb-4 rounded-xl px-4 py-3 text-center text-sm font-medium ${
-                    daysLeft <= 7
-                      ? "bg-red-50 text-red-700"
-                      : daysLeft <= 14
-                        ? "bg-amber-50 text-amber-700"
-                        : "bg-emerald-50 text-emerald-700"
-                  }`}
-                >
-                  {daysLeft > 0 ? (
-                    <>
-                      <span className="font-bold">{daysLeft} days</span> until closing
-                    </>
-                  ) : (
-                    "This role has closed"
-                  )}
-                  <div className="mt-0.5 text-xs opacity-75">{closing}</div>
-                </div>
+                {closing && (
+                  <div
+                    className={`mb-4 rounded-xl px-4 py-3 text-center text-sm font-medium ${
+                      daysLeft !== null && daysLeft <= 7
+                        ? "bg-red-50 text-red-700"
+                        : daysLeft !== null && daysLeft <= 14
+                          ? "bg-amber-50 text-amber-700"
+                          : "bg-emerald-50 text-emerald-700"
+                    }`}
+                  >
+                    {daysLeft !== null && daysLeft > 0 ? (
+                      <>
+                        <span className="font-bold">{daysLeft} days</span> until closing
+                      </>
+                    ) : (
+                      "This role has closed"
+                    )}
+                    <div className="mt-0.5 text-xs opacity-75">{closing}</div>
+                  </div>
+                )}
 
                 <a
-                  href="#"
+                  href={job.external_url ?? "#"}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3.5 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 transition-colors"
@@ -252,6 +270,7 @@ export default async function JobDetailPage({
               </div>
 
               {/* Trust rating card */}
+              {trust?.avg_rating && (
               <div className="rounded-2xl bg-white p-6 ring-1 ring-gray-200">
                 <h3 className="mb-4 text-sm font-semibold text-gray-900">
                   Trust rating
@@ -260,44 +279,26 @@ export default async function JobDetailPage({
                 {/* Overall */}
                 <div className="mb-5 text-center">
                   <p className="text-5xl font-bold text-gray-900">
-                    {job.trustRating.toFixed(1)}
+                    {trust.avg_rating.toFixed(1)}
                   </p>
-                  <StarRating rating={job.trustRating} size="md" />
-                  <p className="mt-1 text-xs text-gray-400">
-                    {job.trustReviewCount} doctor reviews
-                  </p>
+                  <StarRating rating={trust.avg_rating} size="md" />
+                  {trust.review_count && (
+                    <p className="mt-1 text-xs text-gray-400">
+                      {trust.review_count} doctor reviews
+                    </p>
+                  )}
                 </div>
 
-                {/* Category breakdown */}
-                {[
-                  { label: "Rota quality", score: Math.min(5, job.trustRating + 0.2) },
-                  { label: "Consultant support", score: Math.min(5, job.trustRating - 0.1) },
-                  { label: "Work-life balance", score: Math.max(1, job.trustRating - 0.4) },
-                  { label: "Teaching & training", score: Math.min(5, job.trustRating + 0.3) },
-                ].map(({ label, score }) => (
-                  <div key={label} className="mb-3">
-                    <div className="mb-1 flex justify-between text-xs">
-                      <span className="text-gray-600">{label}</span>
-                      <span className="font-medium text-gray-700">
-                        {score.toFixed(1)}
-                      </span>
-                    </div>
-                    <div className="h-1.5 overflow-hidden rounded-full bg-gray-100">
-                      <div
-                        className="h-full rounded-full bg-emerald-500 transition-all"
-                        style={{ width: `${(score / 5) * 100}%` }}
-                      />
-                    </div>
-                  </div>
-                ))}
-
-                <Link
-                  href="#"
-                  className="mt-4 block text-center text-xs font-medium text-emerald-600 hover:text-emerald-700 transition-colors"
-                >
-                  Read all {job.trustReviewCount} reviews →
-                </Link>
+                {trust.review_count && (
+                  <Link
+                    href="#"
+                    className="mt-4 block text-center text-xs font-medium text-emerald-600 hover:text-emerald-700 transition-colors"
+                  >
+                    Read all {trust.review_count} reviews →
+                  </Link>
+                )}
               </div>
+              )}
 
               {/* Interview intel card */}
               <div className="rounded-2xl bg-white p-6 ring-1 ring-gray-200">
