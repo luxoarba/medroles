@@ -5,7 +5,7 @@ import BookmarkButton from "../components/bookmark-button";
 import RefreshButton from "../components/refresh-button";
 import SortSelect from "../components/sort-select";
 import { supabase, formatSalary, type DBJobListing } from "../lib/supabase";
-import { SPECIALTIES, GRADES, CONTRACT_TYPES, TRUST_TYPES, SOURCES } from "../lib/jobs";
+import FilterSidebar from "../components/filter-sidebar";
 
 const GRADE_COLOURS: Record<string, string> = {
   FY1: "bg-sky-50 text-sky-700 ring-sky-200",
@@ -170,26 +170,6 @@ function JobCard({ job }: { job: DBJobListing }) {
   );
 }
 
-function FilterSection({ title, items }: { title: string; items: string[] }) {
-  return (
-    <div>
-      <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-widest text-gray-400">
-        {title}
-      </p>
-      <ul className="space-y-1">
-        {items.map((item) => (
-          <li key={item}>
-            <label className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors">
-              <span className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded border border-gray-300 bg-white" />
-              {item}
-            </label>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
 function toArray(val: string | string[] | undefined): string[] {
   if (!val) return [];
   return Array.isArray(val) ? val : [val];
@@ -257,10 +237,17 @@ export default async function JobsPage({
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
-  const { sort = "closes_at" } = await searchParams;
+  const { sort = "closes_at", specialty, grade, contract, source } = await searchParams;
   const sortValue = Array.isArray(sort) ? sort[0] : sort;
+  const filters = {
+    specialty: toArray(specialty),
+    grade: toArray(grade),
+    contract: toArray(contract),
+    source: toArray(source),
+  };
+  const activeFilterCount = Object.values(filters).reduce((n, v) => n + v.length, 0);
 
-  const jobs = await fetchJobs(sortValue);
+  const jobs = await fetchJobs(sortValue, filters);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -275,6 +262,11 @@ export default async function JobsPage({
               Showing{" "}
               <span className="font-semibold text-emerald-600">{jobs.length}</span>{" "}
               live {jobs.length === 1 ? "role" : "roles"}
+              {activeFilterCount > 0 && (
+                <span className="ml-1.5 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                  {activeFilterCount} filter{activeFilterCount !== 1 ? "s" : ""} active
+                </span>
+              )}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -298,23 +290,9 @@ export default async function JobsPage({
         <div className="flex gap-6">
           {/* Sidebar */}
           <aside className="hidden w-56 flex-shrink-0 lg:block">
-            <div className="sticky top-20 space-y-7 rounded-2xl bg-white p-5 ring-1 ring-gray-200">
-              <FilterSection title="Specialty" items={SPECIALTIES} />
-              <div className="h-px bg-gray-100" />
-              <FilterSection title="Grade" items={GRADES} />
-              <div className="h-px bg-gray-100" />
-              <FilterSection title="Contract" items={CONTRACT_TYPES} />
-              <div className="h-px bg-gray-100" />
-              <FilterSection title="Trust type" items={TRUST_TYPES} />
-              <div className="h-px bg-gray-100" />
-              <FilterSection title="Source" items={SOURCES} />
-              <button className="w-full rounded-lg bg-emerald-600 py-2 text-xs font-semibold text-white hover:bg-emerald-700 transition-colors">
-                Apply filters
-              </button>
-              <button className="w-full rounded-lg py-1.5 text-xs font-medium text-gray-400 hover:text-gray-600 transition-colors">
-                Clear all
-              </button>
-            </div>
+            <Suspense fallback={<div className="rounded-2xl bg-white p-5 ring-1 ring-gray-200 h-96 animate-pulse" />}>
+              <FilterSidebar />
+            </Suspense>
           </aside>
 
           {/* Job cards */}
