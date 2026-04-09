@@ -2,7 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect } from "react";
-import { SPECIALTIES, GRADES, CONTRACT_TYPES, SOURCES } from "../lib/jobs";
+import { SPECIALTIES, GRADES, DEANERIES } from "../lib/jobs";
 
 function FilterSection({
   title,
@@ -60,16 +60,14 @@ export default function FilterSidebar() {
   const [pending, setPending] = useState<Record<string, string[]>>(() => ({
     specialty: searchParams.getAll("specialty"),
     grade: searchParams.getAll("grade"),
-    contract: searchParams.getAll("contract"),
-    source: searchParams.getAll("source"),
+    deanery: searchParams.getAll("deanery"),
   }));
 
   useEffect(() => {
     setPending({
       specialty: searchParams.getAll("specialty"),
       grade: searchParams.getAll("grade"),
-      contract: searchParams.getAll("contract"),
-      source: searchParams.getAll("source"),
+      deanery: searchParams.getAll("deanery"),
     });
   }, [searchParams]);
 
@@ -96,7 +94,7 @@ export default function FilterSidebar() {
   }
 
   function clearAll() {
-    setPending({ specialty: [], grade: [], contract: [], source: [] });
+    setPending({ specialty: [], grade: [], deanery: [] });
     const params = new URLSearchParams();
     const sort = searchParams.get("sort");
     if (sort) params.set("sort", sort);
@@ -106,7 +104,8 @@ export default function FilterSidebar() {
   const hasActive = Object.values(pending).some((v) => v.length > 0);
 
   return (
-    <div className="sticky top-20 space-y-7 rounded-2xl bg-white p-5 ring-1 ring-gray-200">
+    <div className="sticky top-20 flex max-h-[calc(100vh-5.5rem)] flex-col rounded-2xl bg-white ring-1 ring-gray-200">
+      <div className="flex-1 overflow-y-auto p-5 space-y-7">
       <FilterSection
         title="Specialty"
         items={SPECIALTIES}
@@ -122,34 +121,30 @@ export default function FilterSidebar() {
       />
       <div className="h-px bg-gray-100" />
       <FilterSection
-        title="Contract"
-        items={CONTRACT_TYPES}
-        checkedValues={pending.contract}
-        onToggle={(v) => toggle("contract", v)}
+        title="Location"
+        items={DEANERIES}
+        checkedValues={pending.deanery}
+        onToggle={(v) => toggle("deanery", v)}
       />
-      <div className="h-px bg-gray-100" />
-      <FilterSection
-        title="Source"
-        items={SOURCES}
-        checkedValues={pending.source}
-        onToggle={(v) => toggle("source", v)}
-      />
-      <button
-        type="button"
-        onClick={apply}
-        className="w-full rounded-lg bg-emerald-600 py-2 text-xs font-semibold text-white hover:bg-emerald-700 transition-colors"
-      >
-        Apply filters
-      </button>
-      {hasActive && (
+      </div>
+      <div className="flex-shrink-0 border-t border-gray-100 p-5 pt-4 space-y-1.5">
         <button
           type="button"
-          onClick={clearAll}
-          className="w-full rounded-lg py-1.5 text-xs font-medium text-gray-400 hover:text-gray-600 transition-colors"
+          onClick={apply}
+          className="w-full rounded-lg bg-emerald-600 py-2 text-xs font-semibold text-white hover:bg-emerald-700 transition-colors"
         >
-          Clear all
+          Apply filters
         </button>
-      )}
+        {hasActive && (
+          <button
+            type="button"
+            onClick={clearAll}
+            className="w-full rounded-lg py-1.5 text-xs font-medium text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            Clear all
+          </button>
+        )}
+      </div>
     </div>
   );
 }

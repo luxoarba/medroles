@@ -25,7 +25,7 @@ export default function Navbar() {
             Browse Jobs
           </Link>
           <Link
-            href="#"
+            href="/trusts"
             className="rounded-lg px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors"
           >
             Trusts
@@ -47,12 +47,6 @@ export default function Navbar() {
         {/* CTAs */}
         <div className="flex items-center gap-2">
           <NavbarAuth />
-          <Link
-            href="#"
-            className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 transition-colors"
-          >
-            Post a role
-          </Link>
         </div>
       </div>
     </nav>

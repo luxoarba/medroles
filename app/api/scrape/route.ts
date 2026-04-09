@@ -2,13 +2,14 @@
 import { NextResponse } from "next/server";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+// Edge functions require a JWT bearer token — use the anon key (functions have their own service role internally)
+const ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
 function callFunction(name: string) {
   return fetch(`${SUPABASE_URL}/functions/v1/${name}`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+      Authorization: `Bearer ${ANON_KEY}`,
       "Content-Type": "application/json",
     },
     body: "{}",
@@ -16,9 +17,9 @@ function callFunction(name: string) {
 }
 
 export async function POST() {
-  if (!SERVICE_ROLE_KEY) {
+  if (!ANON_KEY) {
     return NextResponse.json(
-      { error: "SUPABASE_SERVICE_ROLE_KEY not configured" },
+      { error: "NEXT_PUBLIC_SUPABASE_ANON_KEY not configured" },
       { status: 500 },
     );
   }

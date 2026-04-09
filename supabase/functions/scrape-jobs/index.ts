@@ -225,6 +225,8 @@ function inferGrade(title: string): string | null {
   if (/\bst8\b/.test(t)) return "ST6";
   if (/\bsas\b|associate specialist|staff grade|specialty doctor|specialty grade doctor|trust grade doctor/.test(t)) return "SAS";
   if (/\bconsultant\b/.test(t)) return "Consultant";
+  if (/senior clinical fellow/.test(t)) return "Senior Clinical Fellow";
+  if (/\bclinical fellow\b/.test(t)) return "Junior Clinical Fellow";
   return null;
 }
 

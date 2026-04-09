@@ -369,10 +369,38 @@ export const SPECIALTIES = [
   "Radiology",
 ];
 
-export const GRADES = ["FY1", "FY2", "CT1", "CT2", "ST3", "ST4", "ST5", "ST6", "SAS", "Consultant"];
+export const GRADES = ["FY1", "FY2", "CT1", "CT2", "ST3", "ST4", "ST5", "ST6", "Junior Clinical Fellow", "Senior Clinical Fellow", "SAS", "Consultant"];
 
-export const CONTRACT_TYPES = ["Permanent", "Fixed Term", "Locum", "Part-time"];
+export const DEANERIES = [
+  "London",
+  "North West",
+  "Northern",
+  "Yorkshire and the Humber",
+  "East Midlands",
+  "West Midlands",
+  "East of England",
+  "Thames Valley",
+  "Wessex",
+  "South West",
+  "Kent, Surrey and Sussex",
+  "Wales",
+];
+
+// Maps each deanery to city/town names that appear in the region column
+export const DEANERY_REGIONS: Record<string, string[]> = {
+  "London": ["London"],
+  "North West": ["Manchester", "Liverpool", "Preston", "Lancaster", "Blackpool", "Chester", "Salford", "Warrington", "Wigan", "Bolton"],
+  "Northern": ["Newcastle", "Durham", "Sunderland", "Middlesbrough", "Gateshead", "Hartlepool"],
+  "Yorkshire and the Humber": ["Leeds", "Sheffield", "Bradford", "Hull", "York", "Wakefield", "Barnsley", "Doncaster", "Harrogate"],
+  "East Midlands": ["Nottingham", "Leicester", "Derby", "Lincoln", "Northampton"],
+  "West Midlands": ["Birmingham", "Coventry", "Wolverhampton", "Stoke", "Worcester"],
+  "East of England": ["Cambridge", "Norwich", "Ipswich", "Bedford", "Luton", "Peterborough"],
+  "Thames Valley": ["Oxford", "Reading", "Milton Keynes"],
+  "Wessex": ["Southampton", "Portsmouth", "Winchester", "Basingstoke", "Bournemouth"],
+  "South West": ["Bristol", "Exeter", "Plymouth", "Bath", "Taunton", "Truro", "Gloucester"],
+  "Kent, Surrey and Sussex": ["Brighton", "Canterbury", "Maidstone", "Guildford"],
+  "Wales": ["Cardiff", "Swansea", "Newport", "Bangor", "Wrexham"],
+};
 
 export const TRUST_TYPES = ["Acute", "Mental Health", "Community", "Teaching", "Foundation"];
 
-export const SOURCES = ["NHS Jobs", "Trac Jobs"];

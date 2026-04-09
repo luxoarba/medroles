@@ -5,6 +5,7 @@ import BookmarkButton from "../components/bookmark-button";
 import RefreshButton from "../components/refresh-button";
 import SortSelect from "../components/sort-select";
 import { supabase, formatSalary, type DBJobListing } from "../lib/supabase";
+import { DEANERY_REGIONS } from "../lib/jobs";
 import FilterSidebar from "../components/filter-sidebar";
 
 const GRADE_COLOURS: Record<string, string> = {
@@ -81,9 +82,19 @@ function JobCard({ job }: { job: DBJobListing }) {
           <h2 className="truncate text-[15px] font-semibold text-gray-900 group-hover:text-emerald-700 transition-colors">
             {job.title}
           </h2>
-          <p className="mt-0.5 truncate text-sm text-gray-500">
-            {trust?.name ?? "NHS Trust"}
-          </p>
+          {job.trust_id ? (
+            <Link
+              href={`/trusts/${job.trust_id}`}
+              onClick={(e) => e.stopPropagation()}
+              className="mt-0.5 block truncate text-sm text-gray-500 hover:text-emerald-600 hover:underline"
+            >
+              {trust?.name ?? "NHS Trust"}
+            </Link>
+          ) : (
+            <p className="mt-0.5 truncate text-sm text-gray-500">
+              {trust?.name ?? "NHS Trust"}
+            </p>
+          )}
         </div>
         <BookmarkButton jobId={job.id} />
       </div>
@@ -180,14 +191,14 @@ async function fetchJobs(
   filters: {
     specialty: string[];
     grade: string[];
-    contract: string[];
-    source: string[];
-  } = { specialty: [], grade: [], contract: [], source: [] },
+    deanery: string[];
+  } = { specialty: [], grade: [], deanery: [] },
 ): Promise<DBJobListing[]> {
   let query = supabase
     .from("job_listings")
     .select(`
       id,
+      trust_id,
       title,
       specialty,
       grade,
@@ -212,8 +223,12 @@ async function fetchJobs(
 
   if (filters.specialty.length > 0) query = query.in("specialty", filters.specialty);
   if (filters.grade.length > 0) query = query.in("grade", filters.grade);
-  if (filters.contract.length > 0) query = query.in("contract_type", filters.contract);
-  if (filters.source.length > 0) query = query.in("source", filters.source);
+  if (filters.deanery.length > 0) {
+    const cities = filters.deanery.flatMap((d) => DEANERY_REGIONS[d] ?? []);
+    if (cities.length > 0) {
+      query = query.or(cities.map((c) => `region.ilike.%${c}%`).join(","));
+    }
+  }
 
   if (sort === "posted_at") {
     query = query.order("posted_at", { ascending: false });
@@ -237,13 +252,12 @@ export default async function JobsPage({
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
-  const { sort = "closes_at", specialty, grade, contract, source } = await searchParams;
+  const { sort = "closes_at", specialty, grade, deanery } = await searchParams;
   const sortValue = Array.isArray(sort) ? sort[0] : sort;
   const filters = {
     specialty: toArray(specialty),
     grade: toArray(grade),
-    contract: toArray(contract),
-    source: toArray(source),
+    deanery: toArray(deanery),
   };
   const activeFilterCount = Object.values(filters).reduce((n, v) => n + v.length, 0);
 

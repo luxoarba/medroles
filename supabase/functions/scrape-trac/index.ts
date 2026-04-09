@@ -48,11 +48,17 @@ function parseJobCards(html: string): ParsedJob[] {
 
     if (!vacancyId) continue;
 
-    const titleMatch = card.match(/<h3[^>]*>\s*([\s\S]*?)\s*<\/h3>/i) ??
+    // <a title="Job Title"> is the most reliable source; fall back to hj-jobtitle div
+    const aTitleMatch = match[0].match(/^<a\s[^>]*title="([^"]+)"/i);
+    const titleMatch = aTitleMatch ? null :
+      card.match(/<div[^>]*hj-jobtitle[^>]*>([\s\S]*?)<\/div>/i) ??
+      card.match(/<h3[^>]*>\s*([\s\S]*?)\s*<\/h3>/i) ??
       card.match(/<p[^>]*>\s*([\s\S]*?)\s*<\/p>/i);
-    const title = titleMatch
-      ? titleMatch[1].replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim()
-      : "";
+    const title = aTitleMatch
+      ? aTitleMatch[1].trim()
+      : titleMatch
+        ? titleMatch[1].replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim()
+        : "";
     if (!title) continue;
 
     const imgAltMatch = card.match(/<img[^>]*alt="([^"]+)"[^>]*>/i);
@@ -62,7 +68,7 @@ function parseJobCards(html: string): ParsedJob[] {
 
     const location = extractLocationFromUrl(href);
 
-    const salaryMatch = card.match(/£[\d,]+(?:\.\d+)?(?:\s*[-–]\s*£[\d,]+(?:\.\d+)?)?[^<]*/i);
+    const salaryMatch = card.match(/£[\d,]+(?:\.\d+)?(?:\s*[-–]\s*£[\d,]+(?:\.\d+)?)?[^<">]*/i);
     const salaryText = salaryMatch ? salaryMatch[0].trim() : null;
 
     const externalUrl = `${BASE_URL}/job/${href.replace(/^\/job\//, "").split("?")[0]}`;
@@ -210,6 +216,8 @@ function normaliseGrade(raw: string | null): string | null {
   }
   if (/consultant/.test(t)) return "Consultant";
   if (/associate specialist|staff grade|specialty doctor|trust grade|sas/.test(t)) return "SAS";
+  if (/senior clinical fellow/.test(t)) return "Senior Clinical Fellow";
+  if (/clinical fellow/.test(t)) return "Junior Clinical Fellow";
   return null;
 }
 

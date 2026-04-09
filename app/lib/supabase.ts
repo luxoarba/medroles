@@ -7,6 +7,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export type DBJobListing = {
   id: string;
+  trust_id: string | null;
   title: string;
   specialty: string | null;
   grade: string | null;
