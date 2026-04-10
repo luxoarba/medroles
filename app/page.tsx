@@ -1,7 +1,18 @@
 import Link from "next/link";
 import Navbar from "./components/navbar";
+import HomeSearch from "./components/home-search";
+import { supabase } from "./lib/supabase";
 
-export default function Home() {
+async function fetchCounts() {
+  const [{ count: jobCount }, { count: trustCount }] = await Promise.all([
+    supabase.from("job_listings").select("*", { count: "exact", head: true }),
+    supabase.from("trusts").select("*", { count: "exact", head: true }),
+  ]);
+  return { jobCount: jobCount ?? 0, trustCount: trustCount ?? 0 };
+}
+
+export default async function Home() {
+  const { jobCount, trustCount } = await fetchCounts();
   return (
     <div className="min-h-screen bg-white">
       <Navbar />
@@ -40,71 +51,23 @@ export default function Home() {
             <span className="font-medium text-gray-700">all in one place.</span>
           </p>
 
-          {/* Search card */}
-          <div className="rounded-2xl bg-white p-2 shadow-xl ring-1 ring-gray-200/80">
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <label className="flex flex-1 items-center gap-3 rounded-xl bg-gray-50 px-4 py-3.5 ring-1 ring-transparent focus-within:ring-emerald-300 transition-all">
-                <svg
-                  className="h-5 w-5 flex-shrink-0 text-gray-400"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={1.5}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"
-                  />
-                </svg>
-                <input
-                  type="text"
-                  placeholder="Specialty — e.g. Cardiology, GP, Psychiatry"
-                  className="w-full bg-transparent text-sm text-gray-700 placeholder-gray-400 outline-none"
-                />
-              </label>
-
-              <label className="flex flex-1 items-center gap-3 rounded-xl bg-gray-50 px-4 py-3.5 ring-1 ring-transparent focus-within:ring-emerald-300 transition-all">
-                <svg
-                  className="h-5 w-5 flex-shrink-0 text-gray-400"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={1.5}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z"
-                  />
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z"
-                  />
-                </svg>
-                <input
-                  type="text"
-                  placeholder="Region — e.g. London, Yorkshire"
-                  className="w-full bg-transparent text-sm text-gray-700 placeholder-gray-400 outline-none"
-                />
-              </label>
-
-              <Link
-                href="/jobs"
-                className="rounded-xl bg-emerald-600 px-6 py-3.5 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 transition-colors whitespace-nowrap"
-              >
-                Search roles
-              </Link>
-            </div>
-          </div>
+          <HomeSearch />
 
           <p className="mt-4 text-xs text-gray-400">
             Popular:{" "}
-            {["Cardiology", "GP", "Emergency Medicine", "Psychiatry", "Radiology"].map((s, i) => (
-              <span key={s}>
-                <Link href="/jobs" className="hover:text-emerald-600 transition-colors underline underline-offset-2">
-                  {s}
+            {[
+              { label: "Cardiology", specialty: "Cardiology" },
+              { label: "GP", specialty: "General Practice" },
+              { label: "Emergency Medicine", specialty: "Emergency Medicine" },
+              { label: "Psychiatry", specialty: "Psychiatry" },
+              { label: "Radiology", specialty: "Radiology" },
+            ].map((item, i) => (
+              <span key={item.label}>
+                <Link
+                  href={`/jobs?specialty=${encodeURIComponent(item.specialty)}`}
+                  className="hover:text-emerald-600 transition-colors underline underline-offset-2"
+                >
+                  {item.label}
                 </Link>
                 {i < 4 ? " · " : ""}
               </span>
@@ -118,23 +81,23 @@ export default function Home() {
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-center gap-x-16 gap-y-6 px-6 py-10">
           <div className="text-center">
             <p className="text-4xl font-bold tabular-nums text-gray-900">
-              6,<span className="text-emerald-600">982</span>
+              <span className="text-emerald-600">{jobCount.toLocaleString("en-GB")}</span>
             </p>
             <p className="mt-1 text-sm text-gray-500">live roles</p>
           </div>
           <div className="hidden h-12 w-px bg-gray-200 lg:block" />
           <div className="text-center">
             <p className="text-4xl font-bold tabular-nums text-gray-900">
-              <span className="text-emerald-600">247</span>
+              <span className="text-emerald-600">{trustCount.toLocaleString("en-GB")}</span>
             </p>
             <p className="mt-1 text-sm text-gray-500">NHS trusts listed</p>
           </div>
           <div className="hidden h-12 w-px bg-gray-200 lg:block" />
           <div className="text-center">
             <p className="text-4xl font-bold tabular-nums text-gray-900">
-              14,<span className="text-emerald-600">300</span>+
+              <span className="text-emerald-600">Coming</span>
             </p>
-            <p className="mt-1 text-sm text-gray-500">verified doctor reviews</p>
+            <p className="mt-1 text-sm text-gray-500">doctor reviews</p>
           </div>
           <div className="hidden h-12 w-px bg-gray-200 lg:block" />
           <div className="text-center">
@@ -300,8 +263,8 @@ export default function Home() {
             href="/jobs"
             className="inline-flex items-center gap-2 rounded-xl bg-white px-6 py-3.5 text-sm font-semibold text-emerald-700 shadow-sm hover:bg-emerald-50 transition-colors"
           >
-            Browse all {" "}
-            <span className="font-bold">6,982</span> roles
+            Browse all{" "}
+            <span className="font-bold">{jobCount.toLocaleString("en-GB")}</span> roles
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
             </svg>
