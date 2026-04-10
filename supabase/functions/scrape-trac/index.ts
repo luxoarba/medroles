@@ -288,16 +288,27 @@ function isDoctorRole(title: string): boolean {
 }
 
 const SPECIALTIES: [RegExp, string][] = [
+  // More specific patterns first to avoid false matches
+  [/neurosurg/i, "Neurosurgery"],
+  [/vascular surg/i, "Vascular Surgery"],
+  [/plastic surg/i, "Plastic Surgery"],
+  [/general surg/i, "General Surgery"],
+  [/critical care|intensive care|\bicu\b|\bitu\b/i, "Critical Care"],
+  [/acute (internal )?med|\baim\b|acute med/i, "Acute Medicine"],
   [/anaesth/i, "Anaesthetics"],
   [/cardiol/i, "Cardiology"],
   [/dermatol/i, "Dermatology"],
-  [/emergency|a&e/i, "Emergency Medicine"],
-  [/general pract|gp\b/i, "General Practice"],
-  [/general surg/i, "General Surgery"],
+  [/emergency|a&e|\baem\b/i, "Emergency Medicine"],
+  [/gastroenterol|gastro(?!intestinal surg)/i, "Gastroenterology"],
+  [/general pract|\bgp\b/i, "General Practice"],
+  [/gynaecol|gynecol|obstet|\bo&g\b|\bo &g\b/i, "Obstetrics & Gynaecology"],
+  [/haematol|hematol/i, "Haematology"],
+  [/neurolog/i, "Neurology"],
   [/orthopaed/i, "Orthopaedics"],
   [/paediatr|pediatr/i, "Paediatrics"],
   [/psych/i, "Psychiatry"],
   [/radiol/i, "Radiology"],
+  [/urolog/i, "Urology"],
 ];
 
 function inferSpecialty(title: string): string | null {

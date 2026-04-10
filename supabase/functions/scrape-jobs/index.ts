@@ -42,15 +42,19 @@ interface ParsedJob {
 
 function getTag(xml: string, tag: string): string | null {
   const m = xml.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, "i"));
-  return m
-    ? m[1]
-        .replace(/&amp;/g, "&")
-        .replace(/&lt;/g, "<")
-        .replace(/&gt;/g, ">")
-        .replace(/&apos;/g, "'")
-        .replace(/&quot;/g, '"')
-        .trim()
-    : null;
+  if (!m) return null;
+  let val = m[1];
+  // Strip CDATA wrapper if present
+  const cdata = val.match(/^<!\[CDATA\[([\s\S]*?)\]\]>$/);
+  if (cdata) val = cdata[1];
+  return val
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&apos;/g, "'")
+    .replace(/&quot;/g, '"')
+    .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(parseInt(code, 10)))
+    .trim();
 }
 
 function parseXmlPage(xml: string): { jobs: ParsedJob[]; totalPages: number } {
@@ -237,16 +241,27 @@ function isDoctorRole(title: string): boolean {
 }
 
 const SPECIALTIES: [RegExp, string][] = [
+  // More specific patterns first to avoid false matches
+  [/neurosurg/i, "Neurosurgery"],
+  [/vascular surg/i, "Vascular Surgery"],
+  [/plastic surg/i, "Plastic Surgery"],
+  [/general surg/i, "General Surgery"],
+  [/critical care|intensive care|\bicu\b|\bitu\b/i, "Critical Care"],
+  [/acute (internal )?med|\baim\b|acute med/i, "Acute Medicine"],
   [/anaesth/i, "Anaesthetics"],
   [/cardiol/i, "Cardiology"],
   [/dermatol/i, "Dermatology"],
-  [/emergency|a&e/i, "Emergency Medicine"],
-  [/general pract|gp\b/i, "General Practice"],
-  [/general surg/i, "General Surgery"],
+  [/emergency|a&e|\baem\b/i, "Emergency Medicine"],
+  [/gastroenterol|gastro(?!intestinal surg)/i, "Gastroenterology"],
+  [/general pract|\bgp\b/i, "General Practice"],
+  [/gynaecol|gynecol|obstet|\bo&g\b|\bo &g\b/i, "Obstetrics & Gynaecology"],
+  [/haematol|hematol/i, "Haematology"],
+  [/neurolog/i, "Neurology"],
   [/orthopaed/i, "Orthopaedics"],
   [/paediatr|pediatr/i, "Paediatrics"],
   [/psych/i, "Psychiatry"],
   [/radiol/i, "Radiology"],
+  [/urolog/i, "Urology"],
 ];
 
 function inferSpecialty(title: string): string | null {
