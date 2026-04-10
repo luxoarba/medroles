@@ -7,7 +7,7 @@ const supabase = createClient(
 
 const BASE_URL = "https://www.healthjobsuk.com";
 const LIST_PATH = "/job_list/Medical_and_Dental";
-const MAX_PAGES = 30; // 1500 raw jobs → ~100–300 doctor roles per run
+const SAFETY_PAGE_CAP = 500; // hard guard against malformed pagination responses
 const LIST_DELAY_MS = 200;
 const DETAIL_CONCURRENCY = 5; // fetch detail pages in batches of 5
 
@@ -94,12 +94,12 @@ function parseTotalPages(html: string): number {
   const totalMatch = html.match(/([\d,]+)\s+(?:jobs?|vacancies)\s+found/i);
   if (totalMatch) {
     const total = parseInt(totalMatch[1].replace(/,/g, ""), 10);
-    return Math.min(Math.ceil(total / 50), MAX_PAGES);
+    return Math.min(Math.ceil(total / 50), SAFETY_PAGE_CAP);
   }
   const pgMatch = html.match(/_pg=(\d+)[^"]*"[^>]*>Last/i) ??
     html.match(/page=(\d+)[^"]*"[^>]*>\s*(?:Last|last)\s*</i);
-  if (pgMatch) return Math.min(parseInt(pgMatch[1], 10), MAX_PAGES);
-  return MAX_PAGES;
+  if (pgMatch) return Math.min(parseInt(pgMatch[1], 10), SAFETY_PAGE_CAP);
+  return SAFETY_PAGE_CAP;
 }
 
 // --- HTML parsing: detail pages ---
