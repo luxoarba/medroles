@@ -192,7 +192,7 @@ async function fetchJobs(
     specialty: string[];
     grade: string[];
     deanery: string[];
-  } = { specialty: [], grade: [], deanery: [] },
+  },
 ): Promise<DBJobListing[]> {
   let query = supabase
     .from("job_listings")
@@ -320,7 +320,9 @@ export default async function JobsPage({
                 </div>
                 <h3 className="mb-1 text-base font-semibold text-gray-700">No roles found</h3>
                 <p className="text-sm text-gray-400">
-                  The job_listings table appears to be empty.
+                  {activeFilterCount > 0
+                    ? "No jobs match your current filters."
+                    : "The job_listings table appears to be empty."}
                 </p>
               </div>
             ) : (
