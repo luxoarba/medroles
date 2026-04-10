@@ -357,16 +357,26 @@ export function getJob(id: string): Job | undefined {
 }
 
 export const SPECIALTIES = [
+  "Acute Medicine",
   "Anaesthetics",
   "Cardiology",
+  "Critical Care",
   "Dermatology",
   "Emergency Medicine",
+  "Gastroenterology",
   "General Practice",
   "General Surgery",
+  "Haematology",
+  "Neurology",
+  "Neurosurgery",
+  "Obstetrics & Gynaecology",
   "Orthopaedics",
   "Paediatrics",
+  "Plastic Surgery",
   "Psychiatry",
   "Radiology",
+  "Urology",
+  "Vascular Surgery",
 ];
 
 export const GRADES = ["FY1", "FY2", "CT1", "CT2", "ST3", "ST4", "ST5", "ST6", "Junior Clinical Fellow", "Senior Clinical Fellow", "SAS", "Consultant"];
