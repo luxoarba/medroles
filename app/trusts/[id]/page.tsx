@@ -48,6 +48,34 @@ function StarRating({ rating }: { rating: number }) {
   );
 }
 
+const CQC_COLOURS: Record<string, { bg: string; text: string; ring: string; dot: string }> = {
+  "Outstanding":           { bg: "bg-amber-50",   text: "text-amber-800",  ring: "ring-amber-200",  dot: "bg-amber-500"  },
+  "Good":                  { bg: "bg-emerald-50",  text: "text-emerald-800",ring: "ring-emerald-200",dot: "bg-emerald-500"},
+  "Requires improvement":  { bg: "bg-orange-50",   text: "text-orange-800", ring: "ring-orange-200", dot: "bg-orange-500" },
+  "Inadequate":            { bg: "bg-red-50",       text: "text-red-800",    ring: "ring-red-200",    dot: "bg-red-500"    },
+};
+
+function CqcBadge({ rating }: { rating: string }) {
+  const c = CQC_COLOURS[rating] ?? { bg: "bg-gray-50", text: "text-gray-600", ring: "ring-gray-200", dot: "bg-gray-400" };
+  return (
+    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${c.bg} ${c.text} ${c.ring}`}>
+      <span className={`h-1.5 w-1.5 rounded-full ${c.dot}`} />
+      {rating}
+    </span>
+  );
+}
+
+function CqcDomain({ label, rating }: { label: string; rating: string | null }) {
+  if (!rating) return null;
+  const c = CQC_COLOURS[rating] ?? { bg: "bg-gray-50", text: "text-gray-600", ring: "ring-gray-200", dot: "bg-gray-400" };
+  return (
+    <div className="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2">
+      <span className="text-xs text-gray-600">{label}</span>
+      <span className={`text-xs font-medium ${c.text}`}>{rating}</span>
+    </div>
+  );
+}
+
 function daysUntil(dateStr: string) {
   return Math.round(
     (new Date(dateStr).getTime() - Date.now()) / (1000 * 60 * 60 * 24),
@@ -64,7 +92,7 @@ export default async function TrustPage({
   const [{ data: trust }, { data: jobs }] = await Promise.all([
     supabase
       .from("trusts")
-      .select("id, name, type, avg_rating, review_count")
+      .select("id, name, type, avg_rating, review_count, cqc_overall, cqc_safe, cqc_effective, cqc_caring, cqc_responsive, cqc_well_led, cqc_report_date")
       .eq("id", id)
       .single(),
     supabase
@@ -124,6 +152,45 @@ export default async function TrustPage({
             </div>
           </div>
         </div>
+
+        {/* CQC ratings */}
+        {trust.cqc_overall && (
+          <div className="mt-5 rounded-2xl bg-white p-6 ring-1 ring-gray-200">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <span className="text-sm font-semibold text-gray-900">CQC Rating</span>
+                <CqcBadge rating={trust.cqc_overall} />
+              </div>
+              {trust.cqc_report_date && (
+                <span className="text-xs text-gray-400">
+                  Last inspected{" "}
+                  {new Date(trust.cqc_report_date).toLocaleDateString("en-GB", {
+                    month: "short",
+                    year: "numeric",
+                  })}
+                </span>
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+              <CqcDomain label="Safe"        rating={trust.cqc_safe} />
+              <CqcDomain label="Effective"   rating={trust.cqc_effective} />
+              <CqcDomain label="Caring"      rating={trust.cqc_caring} />
+              <CqcDomain label="Responsive"  rating={trust.cqc_responsive} />
+              <CqcDomain label="Well-led"    rating={trust.cqc_well_led} />
+            </div>
+            <p className="mt-3 text-[11px] text-gray-400">
+              Source: Care Quality Commission ·{" "}
+              <a
+                href="https://www.cqc.org.uk"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline hover:text-gray-600"
+              >
+                cqc.org.uk
+              </a>
+            </p>
+          </div>
+        )}
 
         {/* Job listings */}
         <div className="mt-8">

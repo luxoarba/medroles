@@ -72,10 +72,8 @@ function JobCard({ job }: { job: DBJobListing }) {
     : null;
 
   return (
-    <Link
-      href={`/jobs/${job.id}`}
-      className="group relative block rounded-2xl bg-white p-6 ring-1 ring-gray-200 hover:ring-emerald-300 hover:shadow-md transition-all duration-150"
-    >
+    <div className="group relative rounded-2xl bg-white p-6 ring-1 ring-gray-200 hover:ring-emerald-300 hover:shadow-md transition-all duration-150">
+      <Link href={`/jobs/${job.id}`} className="absolute inset-0 rounded-2xl" aria-label={job.title} />
       {/* Header */}
       <div className="mb-3 flex items-start justify-between gap-3">
         <div className="min-w-0">
@@ -85,8 +83,7 @@ function JobCard({ job }: { job: DBJobListing }) {
           {job.trust_id ? (
             <Link
               href={`/trusts/${job.trust_id}`}
-              onClick={(e) => e.stopPropagation()}
-              className="mt-0.5 block truncate text-sm text-gray-500 hover:text-emerald-600 hover:underline"
+              className="relative z-10 mt-0.5 block truncate text-sm text-gray-500 hover:text-emerald-600 hover:underline"
             >
               {trust?.name ?? "NHS Trust"}
             </Link>
@@ -96,7 +93,9 @@ function JobCard({ job }: { job: DBJobListing }) {
             </p>
           )}
         </div>
-        <BookmarkButton jobId={job.id} />
+        <div className="relative z-10">
+          <BookmarkButton jobId={job.id} />
+        </div>
       </div>
 
       {/* Tags */}
@@ -151,6 +150,21 @@ function JobCard({ job }: { job: DBJobListing }) {
           </span>
         )}
         {rating !== null && <StarRating rating={rating} />}
+        {trust?.cqc_overall && (
+          <span
+            className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ${
+              trust.cqc_overall === "Outstanding"
+                ? "bg-amber-50 text-amber-700 ring-amber-200"
+                : trust.cqc_overall === "Good"
+                  ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
+                  : trust.cqc_overall === "Requires improvement"
+                    ? "bg-orange-50 text-orange-700 ring-orange-200"
+                    : "bg-red-50 text-red-700 ring-red-200"
+            }`}
+          >
+            CQC: {trust.cqc_overall}
+          </span>
+        )}
       </div>
 
       {/* Footer */}
@@ -177,7 +191,7 @@ function JobCard({ job }: { job: DBJobListing }) {
           )}
         </div>
       )}
-    </Link>
+    </div>
   );
 }
 
@@ -217,7 +231,8 @@ async function fetchJobs(
         name,
         avg_rating,
         review_count,
-        type
+        type,
+        cqc_overall
       )
     `);
 

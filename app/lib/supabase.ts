@@ -23,8 +23,8 @@ export type DBJobListing = {
   source: string | null;
   external_url: string | null;
   trusts:
-    | { name: string; avg_rating: number | null; review_count: number | null; type: string | null }
-    | { name: string; avg_rating: number | null; review_count: number | null; type: string | null }[]
+    | { name: string; avg_rating: number | null; review_count: number | null; type: string | null; cqc_overall: string | null }
+    | { name: string; avg_rating: number | null; review_count: number | null; type: string | null; cqc_overall: string | null }[]
     | null;
   description: string | null;
   requirements: string[] | null;

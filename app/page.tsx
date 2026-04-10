@@ -18,18 +18,19 @@ export default async function Home() {
       <Navbar />
 
       {/* Hero */}
-      <section className="relative overflow-hidden bg-gradient-to-b from-emerald-50 via-emerald-50/40 to-white px-6 pb-24 pt-20">
-        {/* Subtle dot grid */}
-        <div
-          className="pointer-events-none absolute inset-0 opacity-[0.35]"
-          style={{
-            backgroundImage:
-              "radial-gradient(circle, #059669 1px, transparent 1px)",
-            backgroundSize: "28px 28px",
-          }}
-        />
-        {/* Gradient fade over grid */}
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-emerald-50/80 via-transparent to-white" />
+      <section className="relative bg-gradient-to-b from-emerald-50 via-emerald-50/40 to-white px-6 pb-24 pt-20">
+        {/* Background decorations — overflow-hidden scoped here so dropdowns aren't clipped */}
+        <div className="pointer-events-none absolute inset-0 overflow-hidden">
+          <div
+            className="absolute inset-0 opacity-[0.35]"
+            style={{
+              backgroundImage:
+                "radial-gradient(circle, #059669 1px, transparent 1px)",
+              backgroundSize: "28px 28px",
+            }}
+          />
+          <div className="absolute inset-0 bg-gradient-to-b from-emerald-50/80 via-transparent to-white" />
+        </div>
 
         <div className="relative mx-auto max-w-3xl text-center">
           <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-white px-3.5 py-1.5 text-xs font-medium text-emerald-700 shadow-sm">
