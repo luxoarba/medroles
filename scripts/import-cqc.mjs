@@ -1,8 +1,9 @@
 /**
  * CQC ratings import script
  *
- * Fetches all provider listings from the CQC public API, fuzzy-matches them
- * against our trusts table by name, then upserts CQC rating fields.
+ * Downloads the CQC "Care directory with ratings" ODS file, streams the
+ * Providers sheet from the ZIP, and SAX-parses it in tall format:
+ *   one row per (provider, domain) — e.g. "Overall", "Safe", "Effective" …
  *
  * Run from the repo root:
  *   node scripts/import-cqc.mjs
@@ -15,22 +16,32 @@
  *   supabase/migrations/20260410000000_add_cqc_fields.sql
  */
 
-import { readFileSync } from "fs";
+import { readFileSync, writeFileSync, existsSync, unlinkSync } from "fs";
+import { join } from "path";
+import { tmpdir } from "os";
 import { createClient } from "@supabase/supabase-js";
+import yauzl from "yauzl";
+import sax from "sax";
 
 // ---------------------------------------------------------------------------
 // Config
 // ---------------------------------------------------------------------------
 
-const CQC_BASE = "https://api.cqc.org.uk/public/v1";
-const PARTNER_CODE = "medroles";
-const PER_PAGE = 1000;
-const DETAIL_CONCURRENCY = 5;   // parallel provider-detail fetches
-const DELAY_MS = 200;           // ms between batches to avoid hammering API
-const MATCH_THRESHOLD = 0.45;   // minimum token-overlap score to accept a match
+const CQC_ODS_URL =
+  "https://www.cqc.org.uk/sites/default/files/2026-04/01_April_2026_Latest_ratings.ods";
+
+const MATCH_THRESHOLD = 0.40;
+
+// NHS trust provider types to include (exclude care homes, dentists, GPs etc.)
+const NHS_TYPES = new Set([
+  "NHS Trust",
+  "NHS Foundation Trust",
+  "NHS Healthcare Organisation",
+  "NHS Independent Sector",
+]);
 
 // ---------------------------------------------------------------------------
-// Load env from .env.local (no dotenv dep needed)
+// Env loading
 // ---------------------------------------------------------------------------
 
 function loadEnv() {
@@ -40,17 +51,15 @@ function loadEnv() {
       const m = line.match(/^([A-Z_][A-Z0-9_]*)=(.*)$/);
       if (m) process.env[m[1]] ??= m[2].trim();
     }
-  } catch {
-    // .env.local not found — env vars must already be set
-  }
+  } catch { /* already set */ }
 }
 
 // ---------------------------------------------------------------------------
-// Name normalisation & fuzzy matching
+// Fuzzy name matching
 // ---------------------------------------------------------------------------
 
 function normaliseName(name) {
-  return name
+  return String(name ?? "")
     .toLowerCase()
     .replace(/\bnhs\b/g, "")
     .replace(/\bfoundation\b/g, "")
@@ -66,104 +75,226 @@ function tokenSet(name) {
   return new Set(normaliseName(name).split(" ").filter(Boolean));
 }
 
-/** Jaccard-style token overlap score */
 function matchScore(a, b) {
   const sa = tokenSet(a);
   const sb = tokenSet(b);
-  let intersection = 0;
-  for (const t of sa) if (sb.has(t)) intersection++;
-  const union = new Set([...sa, ...sb]).size;
-  return union === 0 ? 0 : intersection / union;
+  if (!sa.size || !sb.size) return 0;
+  let inter = 0;
+  for (const t of sa) if (sb.has(t)) inter++;
+  return inter / new Set([...sa, ...sb]).size;
 }
 
-/** Returns the best-matching CQC provider for a trust name, or null */
 function bestMatch(trustName, cqcProviders) {
-  let best = null;
-  let bestScore = 0;
+  let best = null, bestScore = 0;
   for (const p of cqcProviders) {
-    const score = matchScore(trustName, p.providerName);
-    if (score > bestScore) {
-      bestScore = score;
-      best = p;
-    }
+    const s = matchScore(trustName, p.providerName);
+    if (s > bestScore) { bestScore = s; best = p; }
   }
   return bestScore >= MATCH_THRESHOLD ? { ...best, score: bestScore } : null;
 }
 
 // ---------------------------------------------------------------------------
-// CQC API helpers
+// Download ODS to temp file
 // ---------------------------------------------------------------------------
 
-async function cqcGet(path) {
-  const sep = path.includes("?") ? "&" : "?";
-  const url = `${CQC_BASE}${path}${sep}partnerCode=${PARTNER_CODE}`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`CQC API ${res.status} for ${url}`);
-  return res.json();
-}
-
-async function fetchAllCqcProviders() {
-  console.log("Fetching CQC provider list…");
-  const first = await cqcGet(`/providers?page=1&perPage=${PER_PAGE}`);
-  const totalPages = first.totalPages;
-  console.log(`  ${first.total} total providers across ${totalPages} pages`);
-
-  const all = [...first.providers];
-  for (let page = 2; page <= totalPages; page++) {
-    process.stdout.write(`  page ${page}/${totalPages}\r`);
-    const data = await cqcGet(`/providers?page=${page}&perPage=${PER_PAGE}`);
-    all.push(...data.providers);
-  }
-  console.log(`\nFetched ${all.length} providers`);
-  return all;
-}
-
-async function fetchProviderDetail(providerId) {
-  try {
-    return await cqcGet(`/providers/${providerId}`);
-  } catch (err) {
-    console.warn(`  Could not fetch ${providerId}: ${err.message}`);
-    return null;
-  }
-}
-
-/** Fetch details in small parallel batches */
-async function fetchDetailsBatched(providerIds) {
-  const results = [];
-  for (let i = 0; i < providerIds.length; i += DETAIL_CONCURRENCY) {
-    const batch = providerIds.slice(i, i + DETAIL_CONCURRENCY);
-    process.stdout.write(`  fetching details ${i + 1}–${Math.min(i + DETAIL_CONCURRENCY, providerIds.length)} of ${providerIds.length}\r`);
-    const settled = await Promise.all(batch.map(fetchProviderDetail));
-    results.push(...settled.filter(Boolean));
-    await new Promise((r) => setTimeout(r, DELAY_MS));
-  }
-  console.log("");
-  return results;
+async function downloadToFile() {
+  console.log("Downloading CQC ratings file (24 MB)…");
+  const res = await fetch(CQC_ODS_URL, {
+    headers: { "User-Agent": "MedRoles/1.0 (NHS job board)" },
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const buf = Buffer.from(await res.arrayBuffer());
+  const tmp = join(tmpdir(), "cqc_ratings.ods");
+  writeFileSync(tmp, buf);
+  console.log(`  ${(buf.length / 1024 / 1024).toFixed(1)} MB → ${tmp}`);
+  return tmp;
 }
 
 // ---------------------------------------------------------------------------
-// Rating extraction
+// Stream-parse the Providers sheet from the ODS ZIP
+//
+// The Providers sheet is TALL format — one row per (provider, domain):
+//
+//   Provider ID | Provider Name | Provider Type | … | Domain       | Latest Rating
+//   1-xxx       | Foo NHS Trust | NHS Trust     | … | Overall      | Good
+//   1-xxx       | Foo NHS Trust | NHS Trust     | … | Safe         | Good
+//   1-xxx       | Foo NHS Trust | NHS Trust     | … | Effective    | Outstanding
+//   …
+//
+// We collect all domain rows per Provider ID, then pivot to wide format.
 // ---------------------------------------------------------------------------
 
-/** Returns { overall, safe, effective, caring, responsive, wellLed, reportDate } */
-function extractRatings(detail) {
-  const r = detail?.currentRatings?.overall;
-  if (!r) return null;
+async function parseProvidersSheet(filePath) {
+  return new Promise((resolve, reject) => {
+    yauzl.open(filePath, { lazyEntries: true }, (err, zip) => {
+      if (err) return reject(err);
+      zip.readEntry();
 
-  const domains = {};
-  for (const kq of r.keyQuestionRatings ?? []) {
-    domains[kq.name.toLowerCase().replace(/[^a-z]/g, "")] = kq.rating ?? null;
+      zip.on("entry", (entry) => {
+        if (entry.fileName !== "content.xml") return zip.readEntry();
+
+        zip.openReadStream(entry, (err2, stream) => {
+          if (err2) return reject(err2);
+
+          const parser = sax.createStream(true, {});
+
+          let currentTable = null;
+          let inProviders = false;
+          let headers = null;
+          let rowIdx = 0;
+
+          let cells = [], inText = false, cellText = "", repeatCount = 1;
+
+          // tall: providerId → { providerName, providerType, domains: Map<domain→{rating,reportDate}> }
+          const providerMap = new Map();
+
+          // Column indices (resolved once we see the header)
+          let CI = null;
+
+          parser.on("opentag", (node) => {
+            if (node.name === "table:table") {
+              currentTable = node.attributes["table:name"];
+              inProviders = currentTable === "Providers";
+              rowIdx = 0;
+              headers = null;
+              CI = null;
+              return;
+            }
+            if (!inProviders) return;
+
+            if (node.name === "table:table-row") {
+              cells = [];
+            } else if (node.name === "table:table-cell" || node.name === "table:covered-table-cell") {
+              repeatCount = parseInt(node.attributes["table:number-columns-repeated"] ?? "1", 10);
+              // Date cells: prefer office:date-value attribute if present
+              const dateVal = node.attributes["office:date-value"] ?? null;
+              cellText = dateVal ?? "";
+              inText = dateVal ? false : false; // will be overwritten by text:p if no date attr
+              if (!dateVal) { cellText = ""; inText = false; }
+            } else if (node.name === "text:p") {
+              if (!cellText) inText = true; // only read text if no date attr already set
+            }
+          });
+
+          parser.on("text", (t) => {
+            if (inText && inProviders) cellText += t;
+          });
+
+          parser.on("closetag", (n) => {
+            if (!inProviders) return;
+
+            if (n === "text:p") {
+              inText = false;
+            } else if (n === "table:table-cell" || n === "table:covered-table-cell") {
+              for (let i = 0; i < repeatCount; i++) cells.push(cellText);
+              cellText = "";
+              repeatCount = 1;
+            } else if (n === "table:table-row") {
+              if (rowIdx === 0) {
+                // Header row
+                headers = cells.map((c) => c.trim());
+                const fi = (candidates) => {
+                  for (const c of candidates) {
+                    const i = headers.indexOf(c);
+                    if (i !== -1) return i;
+                  }
+                  const low = headers.map((h) => h.toLowerCase());
+                  for (const c of candidates) {
+                    const i = low.indexOf(c.toLowerCase());
+                    if (i !== -1) return i;
+                  }
+                  return -1;
+                };
+                CI = {
+                  providerId:   fi(["Provider ID"]),
+                  providerName: fi(["Provider Name"]),
+                  providerType: fi(["Provider Type"]),
+                  domain:       fi(["Domain"]),
+                  rating:       fi(["Latest Rating"]),
+                  reportDate:   fi(["Latest Rating (when published)", "Publication Date", "Report Date", "Latest Published Date"]),
+                };
+                console.log("  Providers sheet headers:", headers.slice(0, 16).join(" | "));
+                console.log("  Column indices:", JSON.stringify(CI));
+              } else if (CI && cells.length > CI.providerId) {
+                const id   = cells[CI.providerId]?.trim();
+                const name = cells[CI.providerName]?.trim();
+                const type = cells[CI.providerType]?.trim() ?? "";
+                const domain  = cells[CI.domain]?.trim()  ?? "";
+                const rating  = cells[CI.rating]?.trim()  ?? "";
+                const repDate = CI.reportDate >= 0 ? (cells[CI.reportDate]?.trim() ?? "") : "";
+
+                if (id && name) {
+                  if (!providerMap.has(id)) {
+                    providerMap.set(id, { providerId: id, providerName: name, providerType: type, domains: new Map() });
+                  }
+                  if (domain && rating) {
+                    providerMap.get(id).domains.set(domain.toLowerCase(), { rating, reportDate: repDate });
+                  }
+                }
+
+                if (rowIdx % 20000 === 0) {
+                  process.stdout.write(`  parsed ${rowIdx} rows, ${providerMap.size} providers\r`);
+                }
+              }
+
+              rowIdx++;
+            }
+          });
+
+          parser.on("end", () => {
+            console.log(`\n  Providers sheet: ${rowIdx} rows, ${providerMap.size} unique providers`);
+
+            // Pivot to wide format, filter to NHS trusts
+            const results = [];
+            for (const p of providerMap.values()) {
+              const type = p.providerType.toLowerCase();
+              const isNhs = type.includes("nhs") || type.includes("nhs trust") || type.includes("foundation trust");
+
+              // Also include based on having domains — some NHS entries may have generic types
+              const overall = p.domains.get("overall");
+              if (!overall?.rating) continue; // skip unrated
+              if (!isNhs) continue;
+
+              results.push({
+                providerId:   p.providerId,
+                providerName: p.providerName,
+                overall:      overall.rating,
+                reportDate:   overall.reportDate ?? "",
+                safe:         p.domains.get("safe")?.rating        ?? null,
+                effective:    p.domains.get("effective")?.rating   ?? null,
+                caring:       p.domains.get("caring")?.rating      ?? null,
+                responsive:   p.domains.get("responsive")?.rating  ?? null,
+                wellLed:      p.domains.get("well-led")?.rating    ?? null,
+              });
+            }
+
+            console.log(`  Retained ${results.length} rated NHS providers`);
+            resolve(results);
+          });
+
+          parser.on("error", reject);
+          stream.pipe(parser);
+        });
+      });
+
+      zip.on("error", reject);
+    });
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Date normalisation
+// ---------------------------------------------------------------------------
+
+function normaliseDate(raw) {
+  if (!raw) return null;
+  const d = new Date(raw);
+  if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+  const parts = String(raw).split("/");
+  if (parts.length === 3) {
+    return `${parts[2]}-${parts[1].padStart(2, "0")}-${parts[0].padStart(2, "0")}`;
   }
-
-  return {
-    cqc_overall:    r.rating ?? null,
-    cqc_safe:       domains["safe"] ?? null,
-    cqc_effective:  domains["effective"] ?? null,
-    cqc_caring:     domains["caring"] ?? null,
-    cqc_responsive: domains["responsive"] ?? null,
-    cqc_well_led:   domains["wellled"] ?? null,
-    cqc_report_date: r.reportDate ?? null,
-  };
+  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -182,82 +313,64 @@ async function main() {
 
   const supabase = createClient(supabaseUrl, serviceKey);
 
-  // 1. Fetch our trusts
+  // 1. Our trusts
   console.log("Loading trusts from Supabase…");
-  const { data: trusts, error: trustErr } = await supabase
-    .from("trusts")
-    .select("id, name");
+  const { data: trusts, error: trustErr } = await supabase.from("trusts").select("id, name");
   if (trustErr) { console.error(trustErr); process.exit(1); }
   console.log(`  ${trusts.length} trusts in DB`);
 
-  // 2. Fetch full CQC provider list (IDs + names only)
-  const cqcProviders = await fetchAllCqcProviders();
+  // 2. Download + parse
+  const tmpFile = await downloadToFile();
+  let cqcProviders;
+  try {
+    cqcProviders = await parseProvidersSheet(tmpFile);
+  } finally {
+    if (existsSync(tmpFile)) unlinkSync(tmpFile);
+  }
 
-  // 3. Match each trust to a CQC provider
-  console.log("\nMatching trust names to CQC providers…");
-  const matched = [];
-  const unmatched = [];
+  if (!cqcProviders.length) {
+    console.error("No rated NHS providers found — check debug output above");
+    process.exit(1);
+  }
 
+  // 3. Match
+  console.log("\nMatching trust names…");
+  const matched = [], unmatched = [];
   for (const trust of trusts) {
     const hit = bestMatch(trust.name, cqcProviders);
-    if (hit) {
-      matched.push({ trust, cqcProvider: hit });
-    } else {
-      unmatched.push(trust.name);
-    }
+    if (hit) matched.push({ trust, hit });
+    else unmatched.push(trust.name);
   }
-
   console.log(`  Matched: ${matched.length}  |  Unmatched: ${unmatched.length}`);
-  if (unmatched.length > 0) {
-    console.log("  Unmatched trusts:");
-    for (const name of unmatched) console.log(`    - ${name}`);
+  if (unmatched.length <= 30) {
+    for (const n of unmatched) console.log(`  Unmatched: ${n}`);
   }
 
-  // 4. Fetch CQC details for matched providers
-  console.log("\nFetching CQC provider details for matched trusts…");
-  const providerIds = matched.map((m) => m.cqcProvider.providerId);
-  const details = await fetchDetailsBatched(providerIds);
-
-  // Build map: providerId → detail
-  const detailMap = new Map(details.map((d) => [d.providerId, d]));
-
-  // 5. Upsert ratings into Supabase
-  console.log("Upserting CQC ratings into trusts…");
+  // 4. Upsert
+  console.log("\nUpserting CQC ratings…");
   let updated = 0;
-  let noRatings = 0;
 
-  for (const { trust, cqcProvider } of matched) {
-    const detail = detailMap.get(cqcProvider.providerId);
-    if (!detail) continue;
-
-    // Only import NHS-owned providers (skip independent sector)
-    if (detail.ownershipType && !detail.ownershipType.includes("NHS")) {
-      continue;
-    }
-
-    const ratings = extractRatings(detail);
-    if (!ratings || !ratings.cqc_overall) {
-      noRatings++;
-      continue;
-    }
-
-    const { error } = await supabase
-      .from("trusts")
-      .update({
-        cqc_provider_id: cqcProvider.providerId,
-        ...ratings,
-      })
-      .eq("id", trust.id);
+  for (const { trust, hit } of matched) {
+    const { error } = await supabase.from("trusts").update({
+      cqc_provider_id: hit.providerId,
+      cqc_overall:     hit.overall,
+      cqc_safe:        hit.safe,
+      cqc_effective:   hit.effective,
+      cqc_caring:      hit.caring,
+      cqc_responsive:  hit.responsive,
+      cqc_well_led:    hit.wellLed,
+      cqc_report_date: normaliseDate(hit.reportDate),
+    }).eq("id", trust.id);
 
     if (error) {
-      console.warn(`  Error updating ${trust.name}: ${error.message}`);
+      console.warn(`  Error ${trust.name}: ${error.message}`);
     } else {
-      console.log(`  ✓ ${trust.name} → ${ratings.cqc_overall} (score: ${cqcProvider.score.toFixed(2)})`);
+      console.log(`  ✓ ${trust.name} → ${hit.overall} (score: ${hit.score.toFixed(2)})`);
       updated++;
     }
   }
 
-  console.log(`\nDone. ${updated} trusts updated, ${noRatings} matched but had no CQC rating yet.`);
+  console.log(`\nDone. ${updated}/${trusts.length} trusts updated with CQC ratings.`);
 }
 
 main().catch((err) => { console.error(err); process.exit(1); });
