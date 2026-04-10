@@ -5,197 +5,160 @@ const supabase = createClient(
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
 );
 
-const BASE_URL = "https://www.jobs.nhs.uk";
-const SEARCH_PATH = "/candidate/search/results";
-const MAX_PAGES = 50; // 1000 jobs fetched → ~100–200 doctor roles per run
-const DELAY_MS = 150;
+const XML_API = "https://www.jobs.nhs.uk/api/v1/search_xml";
+const SAFETY_PAGE_CAP = 500;
+const PAGE_BATCH_SIZE = 10;
+const DELAY_MS = 100;
+
+const DOCTOR_KEYWORDS = [
+  "consultant",
+  "registrar",
+  "resident doctor",
+  "foundation doctor",
+  "clinical fellow",
+  "core trainee",
+  "specialty trainee",
+  "trust grade",
+  "associate specialist",
+  "specialty doctor",
+  "GP registrar",
+  "SHO",
+];
 
 interface ParsedJob {
-  vacancyId: string;
+  id: string;
   title: string;
-  trustName: string;
-  location: string | null;
-  salaryText: string | null;
-  closingDateText: string | null;
-  postedDateText: string | null;
-  contractTypeText: string | null;
-  externalUrl: string;
-}
-
-interface NhsJobDetail {
+  employer: string;
   description: string | null;
-  requirements: string[] | null;
-  benefits: string[] | null;
+  type: string | null;
+  salary: string | null;
+  closeDate: string | null;
+  postDate: string | null;
+  url: string;
+  location: string | null;
 }
 
-const DETAIL_CONCURRENCY = 5;
+// --- XML parsing ---
 
-// --- HTML parsing helpers ---
-
-function extractText(html: string, dataTest: string): string | null {
-  const re = new RegExp(
-    `data-test="${dataTest}"[\\s\\S]*?<strong[^>]*>([\\s\\S]*?)<\\/strong>`,
-    "i",
-  );
-  const m = html.match(re);
-  return m ? m[1].trim().replace(/\s+/g, " ") : null;
-}
-
-function parseJobCards(html: string): ParsedJob[] {
-  const jobs: ParsedJob[] = [];
-
-  // Split into individual job card strings on the opening li tag
-  const cardRegex = /<li[^>]*data-test="search-result"[^>]*>([\s\S]*?)(?=<li[^>]*data-test="search-result"|<\/ul>)/g;
-  let match: RegExpExecArray | null;
-
-  while ((match = cardRegex.exec(html)) !== null) {
-    const card = match[1];
-
-    // Extract vacancy ID and title from the job title link
-    const titleLinkMatch = card.match(
-      /\/candidate\/jobadvert\/([^?"'\s]+)[^>]*data-test="search-result-job-title"[^>]*>\s*([\s\S]*?)\s*<\/a>/,
-    ) ?? card.match(
-      /data-test="search-result-job-title"[^>]*href="\/candidate\/jobadvert\/([^?"'\s]+)[^>]*>\s*([\s\S]*?)\s*<\/a>/,
-    ) ?? card.match(
-      /href="\/candidate\/jobadvert\/([^?"'\s]+)[\s\S]*?data-test="search-result-job-title"[^>]*>\s*([\s\S]*?)\s*<\/a>/,
-    );
-
-    if (!titleLinkMatch) continue;
-
-    const vacancyId = titleLinkMatch[1];
-    const title = titleLinkMatch[2].replace(/\s+/g, " ").trim();
-
-    // Extract trust name: first text node inside <h3> inside [data-test="search-result-location"]
-    const locationBlockMatch = card.match(
-      /data-test="search-result-location"[\s\S]*?<h3[^>]*>\s*([\s\S]*?)<div/,
-    );
-    const trustName = locationBlockMatch
-      ? locationBlockMatch[1].replace(/\s+/g, " ").trim()
-      : "NHS Trust";
-
-    // Extract location text from .location-font-size
-    const locationMatch = card.match(/location-font-size"[^>]*>\s*([\s\S]*?)\s*<\/div>/);
-    const location = locationMatch
-      ? locationMatch[1].replace(/\s+/g, " ").trim() || null
-      : null;
-
-    jobs.push({
-      vacancyId,
-      title,
-      trustName,
-      location,
-      salaryText: extractText(card, "search-result-salary"),
-      closingDateText: extractText(card, "search-result-closingDate"),
-      postedDateText: extractText(card, "search-result-publicationDate"),
-      contractTypeText: extractText(card, "search-result-jobType"),
-      externalUrl: `${BASE_URL}/candidate/jobadvert/${vacancyId}`,
-    });
-  }
-
-  return jobs;
-}
-
-function parseTotalPages(html: string): number {
-  const m = html.match(/([\d,]+)\s+jobs?\s+found/i);
-  if (!m) return 1;
-  const total = parseInt(m[1].replace(/,/g, ""), 10);
-  return Math.min(Math.ceil(total / 20), MAX_PAGES);
-}
-
-// --- Detail page parsing ---
-
-function extractSection(html: string, heading: string): string | null {
-  const re = new RegExp(
-    `${heading}[^<]*<\\/h[2-6]>([\\s\\S]*?)(?=<h[2-6]|<\\/section|<\\/article|$)`,
-    "i",
-  );
-  const m = html.match(re);
+function getTag(xml: string, tag: string): string | null {
+  const m = xml.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, "i"));
   return m
     ? m[1]
-        .replace(/<[^>]+>/g, " ")
         .replace(/&amp;/g, "&")
-        .replace(/&nbsp;/g, " ")
-        .replace(/&#\d+;/g, "")
-        .replace(/\s+/g, " ")
-        .trim() || null
+        .replace(/&lt;/g, "<")
+        .replace(/&gt;/g, ">")
+        .replace(/&apos;/g, "'")
+        .replace(/&quot;/g, '"')
+        .trim()
     : null;
 }
 
-function extractListItems(html: string, heading: string): string[] | null {
-  const re = new RegExp(
-    `${heading}[\\s\\S]{0,400}<ul[^>]*>([\\s\\S]*?)<\\/ul>`,
-    "i",
+function parseXmlPage(xml: string): { jobs: ParsedJob[]; totalPages: number } {
+  const totalPagesMatch = xml.match(/<totalPages>(\d+)<\/totalPages>/);
+  const totalPages = Math.min(
+    parseInt(totalPagesMatch?.[1] ?? "1", 10),
+    SAFETY_PAGE_CAP,
   );
-  const m = html.match(re);
-  if (!m) return null;
-  const items = [...m[1].matchAll(/<li[^>]*>([\s\S]*?)<\/li>/gi)]
-    .map((li) =>
-      li[1]
-        .replace(/<[^>]+>/g, "")
-        .replace(/&amp;/g, "&")
-        .replace(/&nbsp;/g, " ")
-        .replace(/&#\d+;/g, "")
-        .replace(/\s+/g, " ")
-        .trim()
-    )
-    .filter(Boolean);
-  return items.length > 0 ? items : null;
-}
 
-function parseNhsJobsDetail(html: string): NhsJobDetail {
-  const description =
-    extractSection(html, "Detailed job description and main responsibilities") ??
-    extractSection(html, "Job overview") ??
-    extractSection(html, "About the role");
+  const jobs: ParsedJob[] = [];
+  const vacancyRegex = /<vacancyDetails>([\s\S]*?)<\/vacancyDetails>/g;
+  let match: RegExpExecArray | null;
 
-  const requirements =
-    extractListItems(html, "Essential criteria") ??
-    extractListItems(html, "Person specification");
+  while ((match = vacancyRegex.exec(xml)) !== null) {
+    const el = match[1];
+    const id = getTag(el, "id");
+    const url = getTag(el, "url");
+    if (!id || !url) continue;
 
-  const benefits =
-    extractListItems(html, "(?:benefits|what we offer|employee benefits)");
+    // Location format: "City, Postcode" — take city portion
+    const locationRaw =
+      el.match(/<location[^>]*>([\s\S]*?)<\/location>/)?.[1]?.trim() ?? null;
+    const location = locationRaw
+      ? locationRaw.split(",")[0].trim() || null
+      : null;
 
-  return { description, requirements, benefits };
-}
+    const postDateRaw = getTag(el, "postDate");
 
-async function fetchNhsDetail(url: string): Promise<NhsJobDetail | null> {
-  try {
-    const res = await fetch(url, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (compatible; MedRoles/1.0; +https://medroles.co.uk)",
-        Accept: "text/html",
-      },
+    // Description may contain HTML markup — strip tags to plain text
+    const rawDesc = getTag(el, "description");
+    const description = rawDesc
+      ? rawDesc.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim() || null
+      : null;
+
+    jobs.push({
+      id,
+      title: getTag(el, "title") ?? "",
+      employer: getTag(el, "employer") ?? "NHS Trust",
+      description,
+      type: getTag(el, "type"),
+      salary: getTag(el, "salary"),
+      closeDate: getTag(el, "closeDate"),
+      postDate: postDateRaw ? postDateRaw.slice(0, 10) : null,
+      url,
+      location,
     });
-    if (!res.ok) return null;
-    return parseNhsJobsDetail(await res.text());
-  } catch {
-    return null;
   }
+
+  return { jobs, totalPages };
 }
 
-// --- Data transformation helpers ---
+// --- Fetch ---
 
-const MONTHS: Record<string, string> = {
-  january: "01", february: "02", march: "03", april: "04",
-  may: "05", june: "06", july: "07", august: "08",
-  september: "09", october: "10", november: "11", december: "12",
+const HEADERS = {
+  "User-Agent":
+    "Mozilla/5.0 (compatible; MedRoles/1.0; +https://medroles.co.uk)",
+  Accept: "application/xml,text/xml",
 };
 
-function parseDate(text: string | null): string | null {
-  if (!text) return null;
-  const m = text.trim().match(/(\d{1,2})\s+(\w+)\s+(\d{4})/);
-  if (!m) return null;
-  const month = MONTHS[m[2].toLowerCase()];
-  if (!month) return null;
-  return `${m[3]}-${month}-${m[1].padStart(2, "0")}`;
+async function fetchXmlPage(keyword: string, page: number): Promise<string> {
+  const url = new URL(XML_API);
+  url.searchParams.set("keyword", keyword);
+  url.searchParams.set("page", String(page));
+  const res = await fetch(url.toString(), { headers: HEADERS });
+  if (!res.ok) {
+    throw new Error(
+      `NHS Jobs XML keyword="${keyword}" page=${page} → ${res.status}`,
+    );
+  }
+  return res.text();
 }
 
-function parseSalary(text: string | null): { min: number | null; max: number | null } {
+async function fetchAllForKeyword(keyword: string): Promise<ParsedJob[]> {
+  const firstXml = await fetchXmlPage(keyword, 1);
+  const { jobs: firstJobs, totalPages } = parseXmlPage(firstXml);
+  const allJobs = [...firstJobs];
+
+  for (let i = 2; i <= totalPages; i += PAGE_BATCH_SIZE) {
+    await new Promise((r) => setTimeout(r, DELAY_MS));
+    const batch = Array.from(
+      { length: Math.min(PAGE_BATCH_SIZE, totalPages - i + 1) },
+      (_, j) => i + j,
+    );
+    const results = await Promise.all(
+      batch.map(async (page) => {
+        try {
+          return parseXmlPage(await fetchXmlPage(keyword, page)).jobs;
+        } catch (e) {
+          console.error(`keyword "${keyword}" page ${page} error:`, e);
+          return [];
+        }
+      }),
+    );
+    for (const r of results) allJobs.push(...r);
+  }
+
+  return allJobs;
+}
+
+// --- Data transformation ---
+
+function parseSalary(
+  text: string | null,
+): { min: number | null; max: number | null } {
   if (!text) return { min: null, max: null };
-  // Skip hourly rates — not comparable with annual salary
   if (/an hour|per hour/i.test(text)) return { min: null, max: null };
-  const nums = [...text.matchAll(/£([\d,]+(?:\.\d+)?)/g)].map(
-    (m) => Math.round(parseFloat(m[1].replace(/,/g, ""))),
+  const nums = [...text.matchAll(/£([\d,]+(?:\.\d+)?)/g)].map((m) =>
+    Math.round(parseFloat(m[1].replace(/,/g, "")))
   );
   if (nums.length === 0) return { min: null, max: null };
   return { min: nums[0], max: nums[1] ?? nums[0] };
@@ -206,65 +169,69 @@ function mapContractType(text: string | null): string | null {
   const t = text.toLowerCase();
   if (t.includes("permanent")) return "Permanent";
   if (t.includes("fixed")) return "Fixed Term";
-  if (t.includes("locum")) return "Locum";
+  if (t.includes("locum") || t.includes("bank")) return "Locum";
   if (/\bpart[\s-]?time\b/.test(t)) return "Part-time";
   return null;
 }
 
 function inferGrade(title: string): string | null {
   const t = title.toLowerCase();
-  if (/\bfy1\b|foundation year 1|foundation doctor 1|resident doctor year 1/.test(t)) return "FY1";
-  if (/\bfy2\b|foundation year 2|foundation doctor 2|resident doctor year 2/.test(t)) return "FY2";
-  if (/\bct1\b|core trainee 1|core surgical trainee 1|core medical trainee 1/.test(t)) return "CT1";
-  if (/\bct2\b|core trainee 2|core surgical trainee 2|core medical trainee 2/.test(t)) return "CT2";
+  if (
+    /\bfy1\b|foundation year 1|foundation doctor 1|resident doctor year 1/.test(t)
+  ) return "FY1";
+  if (
+    /\bfy2\b|foundation year 2|foundation doctor 2|resident doctor year 2/.test(t)
+  ) return "FY2";
+  if (
+    /\bct1\b|core trainee 1|core surgical trainee 1|core medical trainee 1/.test(
+      t,
+    )
+  ) return "CT1";
+  if (
+    /\bct2\b|core trainee 2|core surgical trainee 2|core medical trainee 2/.test(
+      t,
+    )
+  ) return "CT2";
   if (/\bst3\b|specialty registrar.{0,6}st3/.test(t)) return "ST3";
   if (/\bst4\b|specialty registrar.{0,6}st4/.test(t)) return "ST4";
   if (/\bst5\b|specialty registrar.{0,6}st5/.test(t)) return "ST5";
   if (/\bst6\b|specialty registrar.{0,6}st6/.test(t)) return "ST6";
-  if (/\bst7\b/.test(t)) return "ST6"; // map ST7+ to ST6 display
-  if (/\bst8\b/.test(t)) return "ST6";
-  if (/\bsas\b|associate specialist|staff grade|specialty doctor|specialty grade doctor|trust grade doctor/.test(t)) return "SAS";
+  if (/\bst[78]\b/.test(t)) return "ST6";
+  if (
+    /\bsas\b|associate specialist|staff grade|specialty doctor|specialty grade doctor|trust grade doctor/.test(
+      t,
+    )
+  ) return "SAS";
   if (/\bconsultant\b/.test(t)) return "Consultant";
   if (/senior clinical fellow/.test(t)) return "Senior Clinical Fellow";
   if (/\bclinical fellow\b/.test(t)) return "Junior Clinical Fellow";
   return null;
 }
 
-// Broad filter: is this a role that requires a medical degree (GMC/GDC registration)?
 function isDoctorRole(title: string): boolean {
   const t = title.toLowerCase();
   return (
     /\bconsultant\b/.test(t) ||
     /\bregistrar\b/.test(t) ||
-    // Foundation / FY grades (including new "Resident Doctor" terminology from 2024)
     /\bfy[12]\b|foundation year [12]|foundation doctor|foundation programme doctor/.test(t) ||
     /\bresident doctor\b/.test(t) ||
     /\bjunior doctor\b/.test(t) ||
-    // Core training
     /\bct[12]\b|core trainee|core surgical trainee|core medical trainee|core training\b/.test(t) ||
-    // Specialty training
     /\bst[3-9]\b|specialty trainee|specialty registrar/.test(t) ||
-    // Internal Medicine Training
     /\bimt\b|internal medicine trainee/.test(t) ||
-    // SAS grades
     /\bassociate specialist\b/.test(t) ||
     /\bstaff grade\b/.test(t) ||
     /\bspecialty doctor\b/.test(t) ||
     /\bsas doctor\b/.test(t) ||
-    // Trust / locum grades
     /\btrust grade\b/.test(t) ||
     /\blocum\b/.test(t) ||
-    // House officer
     /\bsenior house officer\b|\bsho\b/.test(t) ||
     /\bhouse officer\b/.test(t) ||
-    // GP
     /\bgp\b|\bgpst\b|\bgeneral practitioner\b/.test(t) ||
-    // Medical officer / fellow
     /\bmedical officer\b/.test(t) ||
     /\bclinical fellow\b/.test(t) ||
     /\bmedical fellow\b/.test(t) ||
     /\bphysician\b/.test(t) ||
-    // Dental
     /\bdentist\b|\bdental surgeon\b|\bdental officer\b|\bdental practitioner\b/.test(t)
   );
 }
@@ -297,17 +264,13 @@ async function resolveTrusts(
   const unique = [...new Set(names)];
   const nameToId = new Map<string, string>();
 
-  // Fetch all existing trusts in one query
   const { data: existing } = await supabase
     .from("trusts")
     .select("id, name")
     .in("name", unique);
 
-  for (const row of existing ?? []) {
-    nameToId.set(row.name, row.id);
-  }
+  for (const row of existing ?? []) nameToId.set(row.name, row.id);
 
-  // Create missing trusts in one batch upsert
   const missing = unique.filter((n) => !nameToId.has(n));
   if (missing.length > 0) {
     const { data: created } = await supabase
@@ -317,93 +280,81 @@ async function resolveTrusts(
         { onConflict: "name", ignoreDuplicates: false },
       )
       .select("id, name");
-
-    for (const row of created ?? []) {
-      nameToId.set(row.name, row.id);
-    }
+    for (const row of created ?? []) nameToId.set(row.name, row.id);
   }
 
   return nameToId;
 }
 
-// --- Fetch ---
-
-async function fetchPage(page: number): Promise<string> {
-  const url = new URL(`${BASE_URL}${SEARCH_PATH}`);
-  url.searchParams.set("keyword", "");
-  url.searchParams.set("category", "medical-and-dental");
-  url.searchParams.set("page", String(page));
-
-  const res = await fetch(url.toString(), {
-    headers: {
-      "User-Agent":
-        "Mozilla/5.0 (compatible; MedRoles/1.0; +https://medroles.co.uk)",
-      Accept: "text/html",
-    },
-  });
-
-  if (!res.ok) throw new Error(`NHS Jobs page ${page} returned ${res.status}`);
-  return res.text();
-}
-
 // --- Main ---
 
 Deno.serve(async () => {
-  const stats = { upserted: 0, deleted: 0, errors: 0 };
+  const stats = {
+    upserted: 0,
+    deleted: 0,
+    errors: 0,
+    keywords: {} as Record<string, number>,
+  };
 
   try {
-    const firstHtml = await fetchPage(1);
-    const totalPages = parseTotalPages(firstHtml);
-    const allParsed: ParsedJob[] = parseJobCards(firstHtml);
+    // Run all keyword chains in parallel
+    const keywordResults = await Promise.all(
+      DOCTOR_KEYWORDS.map(async (kw) => {
+        try {
+          const jobs = await fetchAllForKeyword(kw);
+          stats.keywords[kw] = jobs.length;
+          return jobs;
+        } catch (e) {
+          stats.errors++;
+          console.error(`keyword "${kw}" failed:`, e);
+          return [];
+        }
+      }),
+    );
 
-    for (let page = 2; page <= totalPages; page++) {
-      await new Promise((r) => setTimeout(r, DELAY_MS));
-      try {
-        const html = await fetchPage(page);
-        allParsed.push(...parseJobCards(html));
-      } catch (e) {
-        stats.errors++;
-        console.error(`page ${page} fetch error:`, e);
+    // Flatten and deduplicate by vacancy id
+    const seen = new Set<string>();
+    const allJobs: ParsedJob[] = [];
+    for (const jobs of keywordResults) {
+      for (const job of jobs) {
+        if (!seen.has(job.id)) {
+          seen.add(job.id);
+          allJobs.push(job);
+        }
       }
     }
 
-    // Deduplicate by vacancyId — NHS Jobs sometimes returns the same job on multiple pages
-    const seen = new Set<string>();
-    const unique = allParsed.filter((j) => {
-      if (seen.has(j.vacancyId)) return false;
-      seen.add(j.vacancyId);
-      return true;
-    });
+    // Filter to doctor/dentist roles
+    const doctorJobs = allJobs.filter((j) => isDoctorRole(j.title));
 
-    if (unique.length === 0) {
+    if (doctorJobs.length === 0) {
       return new Response(
-        JSON.stringify({ ...stats, warning: "No jobs parsed from HTML" }),
+        JSON.stringify({ ...stats, warning: "No doctor jobs found" }),
         { headers: { "Content-Type": "application/json" } },
       );
     }
 
-    // Filter to doctor/dentist roles only
-    const doctorJobs = unique.filter((j) => isDoctorRole(j.title));
-
-    // Resolve all trusts in two DB calls (not one per job)
-    const trustNames = doctorJobs.map((j) => j.trustName);
-    const trustMap = await resolveTrusts(trustNames);
+    // Resolve trusts
+    const trustMap = await resolveTrusts(doctorJobs.map((j) => j.employer));
 
     // Build upsert rows
     const rows = doctorJobs.map((job) => {
-      const { min, max } = parseSalary(job.salaryText);
+      const { min, max } = parseSalary(job.salary);
       return {
         title: job.title,
-        trust_id: trustMap.get(job.trustName) ?? null,
+        trust_id: trustMap.get(job.employer) ?? null,
         region: job.location,
         grade: inferGrade(job.title),
         specialty: inferSpecialty(job.title),
-        contract_type: mapContractType(job.contractTypeText),
+        contract_type: mapContractType(job.type),
         salary_min: min,
         salary_max: max,
-        closes_at: parseDate(job.closingDateText),
-        posted_at: parseDate(job.postedDateText),
-        external_url: job.externalUrl,
+        closes_at: job.closeDate,
+        posted_at: job.postDate,
+        description: job.description,
+        requirements: null,
+        benefits: null,
+        external_url: job.url,
         source: "NHS Jobs",
         category: "Medical and Dental",
         pay_band: null,
@@ -414,7 +365,6 @@ Deno.serve(async () => {
       };
     });
 
-    // Batch upsert
     const { error: upsertError } = await supabase
       .from("job_listings")
       .upsert(rows, { onConflict: "external_url", ignoreDuplicates: false });
@@ -426,45 +376,13 @@ Deno.serve(async () => {
       stats.upserted = rows.length;
     }
 
-    // Fetch detail pages for NHS Jobs records missing description
-    const { data: nullDescJobs } = await supabase
-      .from("job_listings")
-      .select("id, external_url")
-      .eq("source", "NHS Jobs")
-      .is("description", null)
-      .not("external_url", "is", null)
-      .limit(100);
-
-    if (nullDescJobs && nullDescJobs.length > 0) {
-      for (let i = 0; i < nullDescJobs.length; i += DETAIL_CONCURRENCY) {
-        const batch = nullDescJobs.slice(i, i + DETAIL_CONCURRENCY);
-        await Promise.all(
-          batch.map(async (job: { id: string; external_url: string }) => {
-            const detail = await fetchNhsDetail(job.external_url);
-            if (!detail || (!detail.description && !detail.requirements && !detail.benefits)) return;
-            await supabase
-              .from("job_listings")
-              .update({
-                description: detail.description,
-                requirements: detail.requirements,
-                benefits: detail.benefits,
-              })
-              .eq("id", job.id);
-          }),
-        );
-        if (i + DETAIL_CONCURRENCY < nullDescJobs.length) {
-          await new Promise((r) => setTimeout(r, DELAY_MS));
-        }
-      }
-    }
-
-    // Delete expired jobs from this source only
+    // Delete expired NHS Jobs listings
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - 1);
     const { count } = await supabase
       .from("job_listings")
       .delete({ count: "exact" })
-      .eq("category", "Medical and Dental")
+      .eq("source", "NHS Jobs")
       .lt("closes_at", cutoff.toISOString().slice(0, 10));
 
     stats.deleted = count ?? 0;
