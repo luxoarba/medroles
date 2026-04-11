@@ -43,9 +43,10 @@ function StarRating({ rating }: { rating: number }) {
 }
 
 function daysUntil(dateStr: string) {
-  const today = new Date();
-  const closing = new Date(dateStr);
-  return Math.round((closing.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  // Compare date strings only — avoids UTC-midnight vs local-time drift
+  const todayMs = new Date(new Date().toISOString().slice(0, 10)).getTime();
+  const closingMs = new Date(dateStr).getTime();
+  return Math.round((closingMs - todayMs) / (1000 * 60 * 60 * 24));
 }
 
 function resolveTrust(raw: DBJobListing["trusts"]) {
@@ -165,8 +166,9 @@ function JobCard({ job }: { job: DBJobListing }) {
                     : "text-gray-400"
               }`}
             >
-              {days <= 7 ? "⚠ " : ""}Closes {closing}
-              {days >= 0 ? ` · ${days}d left` : " · Closed"}
+              {days <= 7 ? "⚠ " : ""}
+              {days === 0 ? "Closes today" : `Closes ${closing}`}
+              {days > 0 ? ` · ${days}d left` : days < 0 ? " · Closed" : ""}
             </span>
           ) : (
             <span />

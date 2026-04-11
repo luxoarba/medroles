@@ -77,7 +77,9 @@ export default async function JobDetailPage({
 
   const daysLeft = job.closes_at
     ? Math.round(
-        (new Date(job.closes_at).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+        (new Date(job.closes_at).getTime() -
+          new Date(new Date().toISOString().slice(0, 10)).getTime()) /
+          (1000 * 60 * 60 * 24),
       )
     : null;
 
@@ -270,9 +272,11 @@ export default async function JobDetailPage({
                           : "bg-emerald-50 text-emerald-700"
                     }`}
                   >
-                    {daysLeft !== null && daysLeft > 0 ? (
+                    {daysLeft === 0 ? (
+                      "Closes today"
+                    ) : daysLeft !== null && daysLeft > 0 ? (
                       <>
-                        <span className="font-bold">{daysLeft} days</span> until closing
+                        <span className="font-bold">{daysLeft} day{daysLeft !== 1 ? "s" : ""}</span> left to apply
                       </>
                     ) : (
                       "This role has closed"
