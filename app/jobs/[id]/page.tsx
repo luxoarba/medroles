@@ -58,7 +58,7 @@ export default async function JobDetailPage({
 
   const { data: job } = await supabase
     .from("job_listings")
-    .select("*, trusts(name, avg_rating, review_count, type)")
+    .select("*, trusts(name, avg_rating, review_count, type, cqc_overall)")
     .eq("id", id)
     .single<DBJobListing>();
 
@@ -130,7 +130,24 @@ export default async function JobDetailPage({
                   <h1 className="mb-1 text-2xl font-bold text-gray-900">
                     {job.title}
                   </h1>
-                  <p className="text-base text-gray-500">{trust?.name}</p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-base text-gray-500">{trust?.name}</p>
+                    {trust?.cqc_overall && (
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ${
+                          trust.cqc_overall === "Outstanding"
+                            ? "bg-amber-50 text-amber-700 ring-amber-200"
+                            : trust.cqc_overall === "Good"
+                              ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
+                              : trust.cqc_overall === "Requires improvement"
+                                ? "bg-orange-50 text-orange-700 ring-orange-200"
+                                : "bg-red-50 text-red-700 ring-red-200"
+                        }`}
+                      >
+                        CQC: {trust.cqc_overall}
+                      </span>
+                    )}
+                  </div>
                   <p className="mt-1 text-sm text-gray-400">{job.region}</p>
                 </div>
                 <BookmarkButton jobId={job.id} />
@@ -179,51 +196,63 @@ export default async function JobDetailPage({
                 <h2 className="mb-4 text-base font-semibold text-gray-900">
                   About the role
                 </h2>
-                <p className="leading-7 text-gray-600">{job.description}</p>
+                <div className="space-y-3 leading-7 text-gray-600">
+                  {job.description
+                    .split(/\n{2,}/)
+                    .map((para) => para.trim())
+                    .filter(Boolean)
+                    .map((para, i) => (
+                      <p key={i} className="whitespace-pre-line">{para}</p>
+                    ))}
+                </div>
               </div>
             )}
 
-            {/* Requirements */}
-            {job.requirements && job.requirements.length > 0 && (
+            {/* Person specification */}
+            {((job.requirements && job.requirements.length > 0) || (job.benefits && job.benefits.length > 0)) && (
               <div className="mb-6 rounded-2xl bg-white p-8 ring-1 ring-gray-200">
-                <h2 className="mb-4 text-base font-semibold text-gray-900">
-                  Requirements
+                <h2 className="mb-5 text-base font-semibold text-gray-900">
+                  Person specification
                 </h2>
-                <ul className="space-y-3">
-                  {job.requirements.map((req, i) => (
-                    <li key={i} className="flex items-start gap-3 text-sm text-gray-600">
-                      <span className="mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-emerald-100">
-                        <svg className="h-3 w-3 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                        </svg>
-                      </span>
-                      {req}
-                    </li>
-                  ))}
-                </ul>
+
+                {job.requirements && job.requirements.length > 0 && (
+                  <div className="mb-5">
+                    <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-gray-400">Essential</p>
+                    <ul className="space-y-2.5">
+                      {job.requirements.map((req, i) => (
+                        <li key={i} className="flex items-start gap-3 text-sm text-gray-600">
+                          <span className="mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-emerald-100">
+                            <svg className="h-3 w-3 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                            </svg>
+                          </span>
+                          {req}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {job.benefits && job.benefits.length > 0 && (
+                  <div>
+                    <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-gray-400">Desirable</p>
+                    <ul className="space-y-2.5">
+                      {job.benefits.map((ben, i) => (
+                        <li key={i} className="flex items-start gap-3 text-sm text-gray-600">
+                          <span className="mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-gray-100">
+                            <svg className="h-3 w-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                            </svg>
+                          </span>
+                          {ben}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
             )}
 
-            {/* Benefits */}
-            {job.benefits && job.benefits.length > 0 && (
-              <div className="rounded-2xl bg-white p-8 ring-1 ring-gray-200">
-                <h2 className="mb-4 text-base font-semibold text-gray-900">
-                  Benefits
-                </h2>
-                <ul className="space-y-3">
-                  {job.benefits.map((ben, i) => (
-                    <li key={i} className="flex items-start gap-3 text-sm text-gray-600">
-                      <span className="mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-gray-100">
-                        <svg className="h-3 w-3 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                        </svg>
-                      </span>
-                      {ben}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
           </article>
 
           {/* Sidebar */}

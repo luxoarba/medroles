@@ -150,21 +150,6 @@ function JobCard({ job }: { job: DBJobListing }) {
           </span>
         )}
         {rating !== null && <StarRating rating={rating} />}
-        {trust?.cqc_overall && (
-          <span
-            className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ${
-              trust.cqc_overall === "Outstanding"
-                ? "bg-amber-50 text-amber-700 ring-amber-200"
-                : trust.cqc_overall === "Good"
-                  ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
-                  : trust.cqc_overall === "Requires improvement"
-                    ? "bg-orange-50 text-orange-700 ring-orange-200"
-                    : "bg-red-50 text-red-700 ring-red-200"
-            }`}
-          >
-            CQC: {trust.cqc_overall}
-          </span>
-        )}
       </div>
 
       {/* Footer */}
@@ -234,7 +219,9 @@ async function fetchJobs(
         type,
         cqc_overall
       )
-    `);
+    `)
+    // Only show jobs that close today or later
+    .gte("closes_at", new Date().toISOString().slice(0, 10));
 
   if (filters.specialty.length > 0) query = query.in("specialty", filters.specialty);
   if (filters.grade.length > 0) query = query.in("grade", filters.grade);
@@ -259,7 +246,23 @@ async function fetchJobs(
     throw new Error(error.message);
   }
 
-  return (data ?? []) as unknown as DBJobListing[];
+  const raw = (data ?? []) as unknown as DBJobListing[];
+
+  // Deduplicate: NHS Jobs and Trac sometimes list the same vacancy.
+  // Keep the NHS Jobs copy when both exist (same title + trust + closing date).
+  const seen = new Map<string, DBJobListing>();
+  for (const job of raw) {
+    const key = `${job.title.toLowerCase().trim()}|${job.trust_id ?? ""}|${job.closes_at ?? ""}`;
+    const existing = seen.get(key);
+    if (!existing) {
+      seen.set(key, job);
+    } else if (existing.source !== "NHS Jobs" && job.source === "NHS Jobs") {
+      // Prefer NHS Jobs copy
+      seen.set(key, job);
+    }
+  }
+
+  return Array.from(seen.values());
 }
 
 export default async function JobsPage({
