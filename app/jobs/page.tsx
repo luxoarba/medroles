@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import Navbar from "../components/navbar";
 import BookmarkButton from "../components/bookmark-button";
 import RefreshButton from "../components/refresh-button";
+import AutoScrape from "../components/auto-scrape";
 import SortSelect from "../components/sort-select";
 import { supabase, formatSalary, type DBJobListing } from "../lib/supabase";
 import { DEANERY_REGIONS } from "../lib/jobs";
@@ -285,6 +286,7 @@ export default async function JobsPage({
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <AutoScrape />
       <Navbar />
 
       <div className="mx-auto max-w-7xl px-6 py-8">

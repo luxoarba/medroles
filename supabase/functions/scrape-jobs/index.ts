@@ -11,7 +11,7 @@ const PAGE_BATCH_SIZE = 10;
 const DELAY_MS = 100;
 const DETAIL_BATCH_SIZE = 5;
 const DETAIL_DELAY_MS = 250;
-const MAX_DETAIL_FETCHES = 300; // per run — prioritises jobs not yet enriched
+const MAX_DETAIL_FETCHES = 400; // per run — prioritises jobs not yet enriched
 
 const DOCTOR_KEYWORDS = [
   "consultant",
@@ -79,9 +79,12 @@ function parseXmlPage(xml: string): { jobs: ParsedJob[]; totalPages: number } {
     const url = getTag(el, "url");
     if (!id || !url) continue;
 
-    // Location format: "City, Postcode" — take city portion
+    // Location format: "City, Postcode" — take city portion.
+    // Strip CDATA blocks first to avoid matching <location> text that appears
+    // as literal HTML inside a description or other CDATA-wrapped field.
+    const elStripped = el.replace(/<!\[CDATA\[[\s\S]*?\]\]>/g, "");
     const locationRaw =
-      el.match(/<location[^>]*>([\s\S]*?)<\/location>/)?.[1]?.trim() ?? null;
+      elStripped.match(/<location[^>]*>([\s\S]*?)<\/location>/)?.[1]?.trim() ?? null;
     const location = locationRaw
       ? locationRaw.split(",")[0].trim() || null
       : null;
@@ -366,7 +369,7 @@ const SPECIALTIES: [RegExp, string][] = [
   [/gynaecol|gynecol|obstet|\bo&g\b|\bo &g\b/i, "Obstetrics & Gynaecology"],
   [/haematol|hematol/i, "Haematology"],
   [/neurolog/i, "Neurology"],
-  [/orthopaed/i, "Orthopaedics"],
+  [/orthopaed|\bt\s*&\s*o\b|\bt&o\b/i, "Orthopaedics"],
   [/paediatr|pediatr/i, "Paediatrics"],
   [/psych/i, "Psychiatry"],
   [/radiol/i, "Radiology"],

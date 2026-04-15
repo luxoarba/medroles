@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Navbar from "./components/navbar";
 import HomeSearch from "./components/home-search";
+import AutoScrape from "./components/auto-scrape";
 import { supabase } from "./lib/supabase";
 
 async function fetchCounts() {
@@ -15,6 +16,7 @@ export default async function Home() {
   const { jobCount, trustCount } = await fetchCounts();
   return (
     <div className="min-h-screen bg-white">
+      <AutoScrape />
       <Navbar />
 
       {/* Hero */}

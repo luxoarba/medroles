@@ -7,9 +7,9 @@ const supabase = createClient(
 
 const BASE_URL = "https://www.healthjobsuk.com";
 const LIST_PATH = "/job_list/Medical_and_Dental";
-const SAFETY_PAGE_CAP = 500; // hard guard against malformed pagination responses
-const LIST_DELAY_MS = 200;
-const DETAIL_CONCURRENCY = 5; // fetch detail pages in batches of 5
+const SAFETY_PAGE_CAP = 50;  // healthjobsuk.com Medical & Dental rarely exceeds 50 pages
+const LIST_DELAY_MS = 150;
+const DETAIL_CONCURRENCY = 8; // fetch detail pages in batches of 8
 
 interface ParsedJob {
   vacancyId: string;
@@ -30,6 +30,18 @@ interface DetailData {
   description: string | null;
   requirements: string[] | null;
   benefits: string[] | null;
+}
+
+function decodeEntities(s: string): string {
+  return s
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&apos;/g, "'")
+    .replace(/&quot;/g, '"')
+    .replace(/&#(\d+);/g, (_, c) => String.fromCharCode(parseInt(c, 10)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, c) => String.fromCharCode(parseInt(c, 16)));
 }
 
 // --- HTML parsing: list pages ---
@@ -55,15 +67,15 @@ function parseJobCards(html: string): ParsedJob[] {
       card.match(/<h3[^>]*>\s*([\s\S]*?)\s*<\/h3>/i) ??
       card.match(/<p[^>]*>\s*([\s\S]*?)\s*<\/p>/i);
     const title = aTitleMatch
-      ? aTitleMatch[1].trim()
+      ? decodeEntities(aTitleMatch[1].trim())
       : titleMatch
-        ? titleMatch[1].replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim()
+        ? decodeEntities(titleMatch[1].replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim())
         : "";
     if (!title) continue;
 
     const imgAltMatch = card.match(/<img[^>]*alt="([^"]+)"[^>]*>/i);
     const trustName = imgAltMatch
-      ? imgAltMatch[1].trim()
+      ? decodeEntities(imgAltMatch[1].trim())
       : extractTrustFromUrl(href);
 
     const location = extractLocationFromUrl(href);
@@ -114,39 +126,64 @@ function extractDt(html: string, label: string): string | null {
   return m ? m[1].replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim() : null;
 }
 
-// Extract <li> text items from the first <ul> appearing after a heading matching `label`
-function extractListUnderHeading(html: string, label: string): string[] | null {
-  const re = new RegExp(
-    `${label}[\\s\\S]*?<\\/h[2-6]>([\\s\\S]*?)<ul[^>]*>([\\s\\S]*?)<\\/ul>`,
-    "i",
-  );
-  const m = html.match(re);
-  if (!m) {
-    // Fallback: heading directly before <ul> without intervening content
-    const re2 = new RegExp(
-      `${label}[\\s\\S]{0,300}<ul[^>]*>([\\s\\S]*?)<\\/ul>`,
-      "i",
-    );
-    const m2 = html.match(re2);
-    if (!m2) return null;
-    return extractLiItems(m2[1]);
-  }
-  return extractLiItems(m[2]);
-}
-
 function extractLiItems(ulInner: string): string[] | null {
   const items = [...ulInner.matchAll(/<li[^>]*>([\s\S]*?)<\/li>/gi)]
     .map((m) =>
-      m[1]
-        .replace(/<[^>]+>/g, "")
-        .replace(/&amp;/g, "&")
-        .replace(/&nbsp;/g, " ")
-        .replace(/&#\d+;/g, "")
-        .replace(/\s+/g, " ")
-        .trim()
+      decodeEntities(m[1].replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim())
     )
     .filter(Boolean);
   return items.length > 0 ? items : null;
+}
+
+function htmlToText(html: string): string {
+  return decodeEntities(
+    html
+      .replace(/<br\s*\/?>/gi, "\n")
+      .replace(/<\/(?:p|li|div|h[1-6]|tr)>/gi, "\n")
+      .replace(/<[^>]+>/g, ""),
+  )
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+// Extract the raw HTML content of a div/section element with a specific id.
+// Returns everything from after the opening tag until the next hj-* id marker
+// (which is always the next sibling section on healthjobsuk.com pages).
+function extractRawDivById(html: string, id: string): string | null {
+  const markerIdx = html.indexOf(`id="${id}"`);
+  if (markerIdx < 0) return null;
+  const tagEnd = html.indexOf(">", markerIdx) + 1;
+  const chunk = html.slice(tagEnd, tagEnd + 20000);
+  const nextBoundary = chunk.search(/id="hj-/);
+  return nextBoundary > 0 ? chunk.slice(0, nextBoundary) : chunk.slice(0, 8000);
+}
+
+// Same as above but converts the raw HTML to plain text before returning.
+function extractDivById(html: string, id: string): string | null {
+  const raw = extractRawDivById(html, id);
+  if (!raw) return null;
+  const text = htmlToText(raw);
+  return text.length > 10 ? text : null;
+}
+
+// Collect all <li> items from every <ul> that immediately follows an <h5> with
+// exactly the given heading text. healthjobsuk.com repeats this pattern once per
+// person-spec category (Education, Clinical skills, etc.).
+function extractCriteriaByHeading(html: string, heading: string): string[] {
+  const re = new RegExp(
+    `<h5[^>]*>\\s*${heading}\\s*<\\/h5>\\s*<ul[^>]*>([\\s\\S]*?)<\\/ul>`,
+    "gi",
+  );
+  const seen = new Set<string>();
+  const items: string[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(html)) !== null) {
+    for (const item of extractLiItems(m[1]) ?? []) {
+      if (!seen.has(item)) { seen.add(item); items.push(item); }
+    }
+  }
+  return items;
 }
 
 // Parse "DD/MM/YYYY HH:MM" → "YYYY-MM-DD"
@@ -165,28 +202,27 @@ function parseDetailPage(html: string): DetailData {
   const salaryRaw = extractDt(html, "Salary");
   const employerRaw = extractDt(html, "Employer");
 
-  // Extract description: prose block after a "Job Description" or similar heading
-  const descMatch = html.match(
-    /(?:job description|about the role|job overview|summary)[^<]*<\/h[2-6]>\s*([\s\S]*?)(?=<h[2-6]|<\/section|<\/article|<div\s+class="job-detail)/i,
-  );
-  const description = descMatch
-    ? descMatch[1]
-        .replace(/<[^>]+>/g, " ")
-        .replace(/&amp;/g, "&")
-        .replace(/&nbsp;/g, " ")
-        .replace(/&#\d+;/g, "")
-        .replace(/\s+/g, " ")
-        .trim() || null
-    : null;
+  // Description: extract from healthjobsuk.com's stable section IDs, then
+  // strip the decorative heading line from the top of each section and join.
+  const HEADING_PREFIX = /^(?:Job overview|Main duties of the job|Detailed job description[^\n]*|Working for our organisation)\s*/i;
+  const sections = [
+    extractDivById(html, "hj-job-advert-overview"),
+    extractDivById(html, "hj-job-advert-description"),
+    extractDivById(html, "hj-job-description"),
+    extractDivById(html, "hj-job-advert-organisation"),
+  ]
+    .filter((s): s is string => s !== null)
+    .map((s) => s.replace(HEADING_PREFIX, "").trim())
+    .filter((s) => s.length >= 30);
+  const description = sections.length > 0 ? sections.join("\n\n") : null;
 
-  const requirements = extractListUnderHeading(
-    html,
-    "(?:person specification|requirements|essential criteria)",
-  );
-  const benefits = extractListUnderHeading(
-    html,
-    "(?:benefits|what we offer|what we can offer)",
-  );
+  // Person specification: the hj-job-role-requirement section holds all categories.
+  // Each category has <h5>Essential criteria</h5> / <h5>Desirable criteria</h5>
+  // followed immediately by a <ul>. Collect all items across every category.
+  // Must operate on raw HTML (not text) so the <h5>/<ul> tags are present.
+  const personSpecHtml = extractRawDivById(html, "hj-job-role-requirement") ?? html;
+  const essentialItems = extractCriteriaByHeading(personSpecHtml, "Essential criteria");
+  const desirableItems = extractCriteriaByHeading(personSpecHtml, "Desirable criteria");
 
   return {
     closingDate: parseTracDate(closingRaw),
@@ -196,8 +232,8 @@ function parseDetailPage(html: string): DetailData {
     salaryText: salaryRaw,
     trustName: employerRaw,
     description,
-    requirements,
-    benefits,
+    requirements: essentialItems.length > 0 ? essentialItems : null,
+    benefits: desirableItems.length > 0 ? desirableItems : null,
   };
 }
 
@@ -304,7 +340,7 @@ const SPECIALTIES: [RegExp, string][] = [
   [/gynaecol|gynecol|obstet|\bo&g\b|\bo &g\b/i, "Obstetrics & Gynaecology"],
   [/haematol|hematol/i, "Haematology"],
   [/neurolog/i, "Neurology"],
-  [/orthopaed/i, "Orthopaedics"],
+  [/orthopaed|\bt\s*&\s*o\b|\bt&o\b/i, "Orthopaedics"],
   [/paediatr|pediatr/i, "Paediatrics"],
   [/psych/i, "Psychiatry"],
   [/radiol/i, "Radiology"],

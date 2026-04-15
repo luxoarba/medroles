@@ -33,9 +33,12 @@ export default function NavbarAuth() {
   if (user) {
     return (
       <div className="flex items-center gap-2">
-        <span className="hidden max-w-[160px] truncate text-sm text-gray-500 sm:block">
-          {user.email}
-        </span>
+        <Link
+          href="/account"
+          className="rounded-lg px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors"
+        >
+          My jobs
+        </Link>
         <button
           onClick={handleSignOut}
           className="rounded-lg px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors"

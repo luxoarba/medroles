@@ -16,6 +16,36 @@ function callFunction(name: string) {
   });
 }
 
+const COOLDOWN_MS = 30 * 60 * 1000; // 30 minutes
+
+// Auto-trigger: fires scrapers in the background if last ingestion is stale.
+// Called on page visit — returns immediately so it never blocks rendering.
+export async function GET() {
+  if (!ANON_KEY) return NextResponse.json({ skipped: true });
+
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/job_listings?select=created_at&order=created_at.desc&limit=1`,
+      { headers: { apikey: ANON_KEY, Authorization: `Bearer ${ANON_KEY}` } },
+    );
+    const [latest] = await res.json();
+    if (latest?.created_at) {
+      const ageMs = Date.now() - new Date(latest.created_at).getTime();
+      if (ageMs < COOLDOWN_MS) {
+        return NextResponse.json({ skipped: true });
+      }
+    }
+  } catch {
+    // If the check fails just proceed and try to scrape
+  }
+
+  // Fire both scrapers without awaiting — don't block the response
+  callFunction("scrape-jobs");
+  callFunction("scrape-trac");
+
+  return NextResponse.json({ triggered: true });
+}
+
 export async function POST() {
   if (!ANON_KEY) {
     return NextResponse.json(
