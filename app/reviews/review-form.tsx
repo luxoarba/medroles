@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { SPECIALTIES, GRADES } from "../lib/jobs";
 
 const RATINGS = [1, 2, 3, 4, 5];
@@ -45,10 +46,13 @@ function StarPicker({
 
 export default function ReviewForm({
   trusts,
+  defaultTrustId,
 }: {
   trusts: { id: string; name: string }[];
+  defaultTrustId?: string;
 }) {
-  const [trustId, setTrustId] = useState("");
+  const router = useRouter();
+  const [trustId, setTrustId] = useState(defaultTrustId ?? "");
   const [grade, setGrade] = useState("");
   const [specialty, setSpecialty] = useState("");
   const [overall, setOverall] = useState<number | null>(null);
@@ -85,8 +89,9 @@ export default function ReviewForm({
 
     if (res.ok) {
       setStatus("success");
-      setTrustId(""); setGrade(""); setSpecialty(""); setText("");
+      setTrustId(defaultTrustId ?? ""); setGrade(""); setSpecialty(""); setText("");
       setOverall(null); setTraining(null); setRota(null); setCulture(null);
+      router.refresh();
     } else {
       const { error: msg } = await res.json().catch(() => ({ error: "Submission failed." }));
       setError(msg ?? "Submission failed.");

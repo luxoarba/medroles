@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { SPECIALTIES, GRADES } from "../lib/jobs";
 
 const FORMATS = ["Panel interview", "Portfolio-based", "OSCE / clinical stations", "Situational judgement", "Presentation", "Informal chat", "Other"];
@@ -14,10 +15,13 @@ const DIFFICULTIES = [
 
 export default function InterviewForm({
   trusts,
+  defaultTrustId,
 }: {
   trusts: { id: string; name: string }[];
+  defaultTrustId?: string;
 }) {
-  const [trustId, setTrustId] = useState("");
+  const router = useRouter();
+  const [trustId, setTrustId] = useState(defaultTrustId ?? "");
   const [specialty, setSpecialty] = useState("");
   const [grade, setGrade] = useState("");
   const [format, setFormat] = useState("");
@@ -52,8 +56,9 @@ export default function InterviewForm({
 
     if (res.ok) {
       setStatus("success");
-      setTrustId(""); setSpecialty(""); setGrade(""); setFormat("");
+      setTrustId(defaultTrustId ?? ""); setSpecialty(""); setGrade(""); setFormat("");
       setQuestions(""); setDifficulty(null); setGotOffer(null);
+      router.refresh(); // re-fetch server component so new submission appears
     } else {
       const { error: msg } = await res.json().catch(() => ({ error: "Submission failed." }));
       setError(msg ?? "Submission failed.");

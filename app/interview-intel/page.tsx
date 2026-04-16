@@ -10,17 +10,31 @@ const DIFFICULTY_LABELS: Record<number, { label: string; colour: string }> = {
   5: { label: "Very hard", colour: "text-red-600" },
 };
 
-export default async function InterviewIntelPage() {
-  const [{ data: trusts }, { data: insights }] = await Promise.all([
-    supabase
-      .from("trusts")
-      .select("id, name")
-      .order("name", { ascending: true }),
-    supabase
-      .from("interview_insights")
-      .select("id, trust_id, specialty, grade, format, questions_asked, difficulty, got_offer, created_at, trusts(name)")
-      .order("created_at", { ascending: false })
-      .limit(50),
+export default async function InterviewIntelPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ trust_id?: string }>;
+}) {
+  const { trust_id } = await searchParams;
+
+  const [{ data: trusts }, { data: insights }, trustName] = await Promise.all([
+    supabase.from("trusts").select("id, name").order("name", { ascending: true }),
+    (trust_id
+      ? supabase
+          .from("interview_insights")
+          .select("id, trust_id, specialty, grade, format, questions_asked, difficulty, got_offer, created_at, trusts(name)")
+          .eq("trust_id", trust_id)
+          .order("created_at", { ascending: false })
+          .limit(50)
+      : supabase
+          .from("interview_insights")
+          .select("id, trust_id, specialty, grade, format, questions_asked, difficulty, got_offer, created_at, trusts(name)")
+          .order("created_at", { ascending: false })
+          .limit(50)
+    ),
+    trust_id
+      ? supabase.from("trusts").select("name").eq("id", trust_id).single().then(({ data }) => data?.name ?? null)
+      : Promise.resolve(null),
   ]);
 
   return (
@@ -30,16 +44,24 @@ export default async function InterviewIntelPage() {
       <div className="mx-auto max-w-3xl px-6 py-12">
         {/* Header */}
         <div className="mb-8">
+          {trustName && (
+            <p className="mb-1 text-sm text-gray-500">
+              <a href="/interview-intel" className="hover:underline">Interview Intel</a>
+              {" "}›{" "}{trustName}
+            </p>
+          )}
           <h1 className="text-2xl font-bold text-gray-900">Interview Intel</h1>
           <p className="mt-2 text-sm text-gray-500">
-            Real interview experiences shared by doctors. Know what to expect before you apply.
+            {trustName
+              ? `Real interview experiences at ${trustName}.`
+              : "Real interview experiences shared by doctors. Know what to expect before you apply."}
           </p>
         </div>
 
         {/* Submission form */}
         <div className="mb-10 rounded-2xl bg-white p-7 ring-1 ring-gray-200">
           <h2 className="mb-5 text-base font-semibold text-gray-900">Share your interview experience</h2>
-          <InterviewForm trusts={trusts ?? []} />
+          <InterviewForm trusts={trusts ?? []} defaultTrustId={trust_id} />
         </div>
 
         {/* Insights list */}

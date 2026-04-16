@@ -27,17 +27,31 @@ function StarDisplay({ rating, max = 5 }: { rating: number; max?: number }) {
   );
 }
 
-export default async function ReviewsPage() {
-  const [{ data: trusts }, { data: reviews }] = await Promise.all([
-    supabase
-      .from("trusts")
-      .select("id, name")
-      .order("name", { ascending: true }),
-    supabase
-      .from("trust_reviews")
-      .select("id, trust_id, grade, specialty, rota_rating, training_rating, culture_rating, overall_rating, review_text, created_at, trusts(name)")
-      .order("created_at", { ascending: false })
-      .limit(50),
+export default async function ReviewsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ trust_id?: string }>;
+}) {
+  const { trust_id } = await searchParams;
+
+  const [{ data: trusts }, { data: reviews }, trustName] = await Promise.all([
+    supabase.from("trusts").select("id, name").order("name", { ascending: true }),
+    (trust_id
+      ? supabase
+          .from("trust_reviews")
+          .select("id, trust_id, grade, specialty, rota_rating, training_rating, culture_rating, overall_rating, review_text, created_at, trusts(name)")
+          .eq("trust_id", trust_id)
+          .order("created_at", { ascending: false })
+          .limit(50)
+      : supabase
+          .from("trust_reviews")
+          .select("id, trust_id, grade, specialty, rota_rating, training_rating, culture_rating, overall_rating, review_text, created_at, trusts(name)")
+          .order("created_at", { ascending: false })
+          .limit(50)
+    ),
+    trust_id
+      ? supabase.from("trusts").select("name").eq("id", trust_id).single().then(({ data }) => data?.name ?? null)
+      : Promise.resolve(null),
   ]);
 
   return (
@@ -47,17 +61,24 @@ export default async function ReviewsPage() {
       <div className="mx-auto max-w-3xl px-6 py-12">
         {/* Header */}
         <div className="mb-8">
+          {trustName && (
+            <p className="mb-1 text-sm text-gray-500">
+              <a href="/reviews" className="hover:underline">Reviews</a>
+              {" "}›{" "}{trustName}
+            </p>
+          )}
           <h1 className="text-2xl font-bold text-gray-900">Trust Reviews</h1>
           <p className="mt-2 text-sm text-gray-500">
-            Anonymous reviews from doctors about working conditions, training quality, and culture.
-            Help your colleagues make informed decisions.
+            {trustName
+              ? `Anonymous reviews from doctors who worked at ${trustName}.`
+              : "Anonymous reviews from doctors about working conditions, training quality, and culture."}
           </p>
         </div>
 
         {/* Submission form */}
         <div className="mb-10 rounded-2xl bg-white p-7 ring-1 ring-gray-200">
           <h2 className="mb-5 text-base font-semibold text-gray-900">Share your experience</h2>
-          <ReviewForm trusts={trusts ?? []} />
+          <ReviewForm trusts={trusts ?? []} defaultTrustId={trust_id} />
         </div>
 
         {/* Reviews list */}
