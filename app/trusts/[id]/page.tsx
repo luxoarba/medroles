@@ -1,7 +1,43 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import type { Metadata } from "next";
 import Navbar from "../../components/navbar";
 import { supabase, formatSalary } from "../../lib/supabase";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
+  const { id } = await params;
+  const { data: trust } = await supabase
+    .from("trusts")
+    .select("name, type, avg_rating, review_count, cqc_overall")
+    .eq("id", id)
+    .single();
+
+  if (!trust) return { title: "Trust not found" };
+
+  const title = trust.name;
+  const parts = [
+    trust.type,
+    trust.cqc_overall ? `CQC: ${trust.cqc_overall}` : null,
+    trust.avg_rating ? `${trust.avg_rating.toFixed(1)}★ from doctors` : null,
+  ].filter(Boolean);
+  const description = `${trust.name} — ${parts.join(" · ")}. View vacancies, CQC ratings, doctor reviews and interview intel.`;
+
+  return {
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      url: `https://www.medroles.co.uk/trusts/${id}`,
+      type: "website",
+    },
+    twitter: { title, description },
+  };
+}
 
 const GRADE_COLOURS: Record<string, string> = {
   FY1: "bg-sky-50 text-sky-700 ring-sky-200",

@@ -1,6 +1,17 @@
+import type { Metadata } from "next";
 import Navbar from "../components/navbar";
 import ReviewForm from "./review-form";
 import { supabase } from "../lib/supabase";
+
+export const metadata: Metadata = {
+  title: "Trust Reviews",
+  description: "Anonymous reviews from doctors about working conditions, training quality, rota and culture at NHS trusts across the UK.",
+  openGraph: {
+    title: "NHS Trust Reviews — MedRoles",
+    description: "Anonymous reviews from doctors about working conditions, training quality and culture at NHS trusts.",
+    url: "https://www.medroles.co.uk/reviews",
+  },
+};
 
 const CQC_COLOURS: Record<string, string> = {
   Outstanding: "text-amber-600",

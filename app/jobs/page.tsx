@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 import Navbar from "../components/navbar";
@@ -10,6 +11,16 @@ import MobileFilterDrawer from "../components/mobile-filter-drawer";
 import { supabase, formatSalary, type DBJobListing } from "../lib/supabase";
 import { DEANERY_REGIONS } from "../lib/jobs";
 import FilterSidebar from "../components/filter-sidebar";
+
+export const metadata: Metadata = {
+  title: "NHS Doctor Jobs",
+  description: "Browse NHS consultant, registrar, clinical fellow and GP jobs across the UK. Filter by specialty, grade, region and trust.",
+  openGraph: {
+    title: "NHS Doctor Jobs — MedRoles",
+    description: "Browse NHS consultant, registrar, clinical fellow and GP jobs across the UK.",
+    url: "https://www.medroles.co.uk/jobs",
+  },
+};
 
 const GRADE_COLOURS: Record<string, string> = {
   FY1: "bg-sky-50 text-sky-700 ring-sky-200",

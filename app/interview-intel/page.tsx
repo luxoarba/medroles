@@ -1,6 +1,17 @@
+import type { Metadata } from "next";
 import Navbar from "../components/navbar";
 import InterviewForm from "./interview-form";
 import { supabase } from "../lib/supabase";
+
+export const metadata: Metadata = {
+  title: "Interview Intel",
+  description: "Real NHS interview experiences shared by doctors. Know what questions to expect, the format and difficulty before you apply.",
+  openGraph: {
+    title: "NHS Interview Intel — MedRoles",
+    description: "Real NHS interview experiences shared by doctors. Know what to expect before you apply.",
+    url: "https://www.medroles.co.uk/interview-intel",
+  },
+};
 
 const DIFFICULTY_LABELS: Record<number, { label: string; colour: string }> = {
   1: { label: "Very easy", colour: "text-emerald-600" },

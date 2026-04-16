@@ -1,8 +1,51 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import type { Metadata } from "next";
 import Navbar from "../../components/navbar";
 import BookmarkButton from "../../components/bookmark-button";
 import { supabase, formatSalary, type DBJobListing } from "../../lib/supabase";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
+  const { id } = await params;
+  const { data: job } = await supabase
+    .from("job_listings")
+    .select("title, description, region, specialty, grade, closes_at, trusts(name)")
+    .eq("id", id)
+    .single();
+
+  if (!job) return { title: "Job not found" };
+
+  const trust = Array.isArray(job.trusts) ? job.trusts[0] : job.trusts;
+  const trustName = (trust as { name: string } | null)?.name ?? "NHS Trust";
+  const title = `${job.title} — ${trustName}`;
+  const parts = [
+    job.specialty,
+    job.grade,
+    job.region,
+    job.closes_at
+      ? `Closes ${new Date(job.closes_at).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}`
+      : null,
+  ].filter(Boolean);
+  const description = job.description
+    ? job.description.slice(0, 155).replace(/\s+/g, " ").trim() + "…"
+    : `${title}. ${parts.join(" · ")}`;
+
+  return {
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      url: `https://www.medroles.co.uk/jobs/${id}`,
+      type: "website",
+    },
+    twitter: { title, description },
+  };
+}
 
 function StarRating({
   rating,
@@ -93,8 +136,59 @@ export default async function JobDetailPage({
       )
     : null;
 
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "JobPosting",
+    title: job.title,
+    description: job.description
+      ? job.description.slice(0, 5000).replace(/\s+/g, " ").trim()
+      : `${job.title} at ${trust?.name ?? "NHS Trust"}`,
+    datePosted: job.posted_at
+      ? new Date(job.posted_at).toISOString().slice(0, 10)
+      : undefined,
+    validThrough: job.closes_at
+      ? new Date(job.closes_at).toISOString()
+      : undefined,
+    hiringOrganization: {
+      "@type": "Organization",
+      name: trust?.name ?? "NHS Trust",
+      sameAs: "https://www.nhs.uk",
+    },
+    jobLocation: {
+      "@type": "Place",
+      address: {
+        "@type": "PostalAddress",
+        addressLocality: job.region ?? undefined,
+        addressCountry: "GB",
+      },
+    },
+    ...(job.salary_min != null
+      ? {
+          baseSalary: {
+            "@type": "MonetaryAmount",
+            currency: "GBP",
+            value: {
+              "@type": "QuantitativeValue",
+              minValue: job.salary_min,
+              maxValue: job.salary_max ?? job.salary_min,
+              unitText: "YEAR",
+            },
+          },
+        }
+      : {}),
+    ...(job.contract_type
+      ? { employmentType: job.contract_type.toUpperCase().replace(/\s+/g, "_") }
+      : {}),
+    url: `https://www.medroles.co.uk/jobs/${id}`,
+    ...(job.external_url ? { applicationContact: { url: job.external_url } } : {}),
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       <Navbar />
 
       {/* Breadcrumb */}
