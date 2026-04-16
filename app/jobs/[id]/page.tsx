@@ -66,6 +66,16 @@ export default async function JobDetailPage({
 
   const trust = Array.isArray(job.trusts) ? job.trusts[0] : job.trusts;
 
+  // Fetch up to 3 interview insights for this trust to show in sidebar
+  const { data: insights } = job.trust_id
+    ? await supabase
+        .from("interview_insights")
+        .select("id, format, questions_asked, difficulty, got_offer")
+        .eq("trust_id", job.trust_id)
+        .order("created_at", { ascending: false })
+        .limit(3)
+    : { data: null };
+
   const closing = job.closes_at
     ? new Date(job.closes_at).toLocaleDateString("en-GB", {
         weekday: "long",
@@ -322,43 +332,49 @@ export default async function JobDetailPage({
                   )}
                 </div>
 
-                {trust.review_count && (
-                  <Link
-                    href="#"
-                    className="mt-4 block text-center text-xs font-medium text-emerald-600 hover:text-emerald-700 transition-colors"
-                  >
-                    Read all {trust.review_count} reviews →
-                  </Link>
-                )}
+                <Link
+                  href={job.trust_id ? `/reviews?trust_id=${job.trust_id}` : "/reviews"}
+                  className="mt-4 block text-center text-xs font-medium text-emerald-600 hover:text-emerald-700 transition-colors"
+                >
+                  {trust.review_count ? `Read all ${trust.review_count} reviews →` : "Leave a review →"}
+                </Link>
               </div>
               )}
 
               {/* Interview intel card */}
               <div className="rounded-2xl bg-white p-6 ring-1 ring-gray-200">
-                <h3 className="mb-1 text-sm font-semibold text-gray-900">
-                  Interview intel
-                </h3>
-                <p className="mb-4 text-xs text-gray-500">
-                  Shared by doctors who interviewed here
-                </p>
-                <div className="space-y-2">
-                  {["Portfolio-based station", "Clinical scenario", "Management question"].map(
-                    (item) => (
-                      <div
-                        key={item}
-                        className="flex items-center gap-2 rounded-lg bg-gray-50 px-3 py-2.5 text-xs text-gray-600"
-                      >
-                        <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-emerald-500" />
-                        {item}
+                <h3 className="mb-1 text-sm font-semibold text-gray-900">Interview intel</h3>
+                <p className="mb-4 text-xs text-gray-500">Shared by doctors who interviewed here</p>
+                {insights && insights.length > 0 ? (
+                  <div className="space-y-3">
+                    {insights.map((ins) => (
+                      <div key={ins.id} className="rounded-lg bg-gray-50 p-3">
+                        {ins.format && (
+                          <span className="mb-1.5 inline-block rounded bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-700">
+                            {ins.format}
+                          </span>
+                        )}
+                        {ins.questions_asked && (
+                          <p className="line-clamp-3 text-xs text-gray-600 leading-relaxed">
+                            {ins.questions_asked}
+                          </p>
+                        )}
+                        {ins.got_offer !== null && (
+                          <p className={`mt-1.5 text-[10px] font-medium ${ins.got_offer ? "text-emerald-600" : "text-gray-400"}`}>
+                            {ins.got_offer ? "✓ Got offer" : "No offer"}
+                          </p>
+                        )}
                       </div>
-                    )
-                  )}
-                </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-gray-400">No reports yet for this trust.</p>
+                )}
                 <Link
-                  href="#"
+                  href={job.trust_id ? `/interview-intel?trust_id=${job.trust_id}` : "/interview-intel"}
                   className="mt-4 block text-center text-xs font-medium text-emerald-600 hover:text-emerald-700 transition-colors"
                 >
-                  See full interview guide →
+                  {insights && insights.length > 0 ? "See all interview reports →" : "Be the first to share →"}
                 </Link>
               </div>
             </div>
