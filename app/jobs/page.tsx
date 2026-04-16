@@ -239,7 +239,19 @@ async function fetchJobs(
   }
 
   if (filters.search) {
-    query = query.ilike("title", `%${filters.search}%`);
+    // Find trust IDs whose name matches, then OR against title
+    const { data: matchingTrusts } = await supabase
+      .from("trusts")
+      .select("id")
+      .ilike("name", `%${filters.search}%`);
+    const trustIds = (matchingTrusts ?? []).map((t: { id: string }) => t.id);
+    if (trustIds.length > 0) {
+      query = query.or(
+        `title.ilike.%${filters.search}%,trust_id.in.(${trustIds.join(",")})`,
+      );
+    } else {
+      query = query.ilike("title", `%${filters.search}%`);
+    }
   }
 
   if (sort === "posted_at") {

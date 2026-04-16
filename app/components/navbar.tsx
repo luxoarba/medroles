@@ -31,13 +31,13 @@ export default function Navbar() {
             Trusts
           </Link>
           <Link
-            href="#"
+            href="/reviews"
             className="rounded-lg px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors"
           >
             Reviews
           </Link>
           <Link
-            href="#"
+            href="/interview-intel"
             className="rounded-lg px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors"
           >
             Interview Intel

@@ -1,0 +1,139 @@
+import Navbar from "../components/navbar";
+import ReviewForm from "./review-form";
+import { supabase } from "../lib/supabase";
+
+const CQC_COLOURS: Record<string, string> = {
+  Outstanding: "text-amber-600",
+  Good: "text-emerald-600",
+  "Requires improvement": "text-orange-600",
+  Inadequate: "text-red-600",
+};
+
+function StarDisplay({ rating, max = 5 }: { rating: number; max?: number }) {
+  return (
+    <span className="flex items-center gap-0.5">
+      {Array.from({ length: max }, (_, i) => (
+        <svg
+          key={i}
+          viewBox="0 0 20 20"
+          fill={i < Math.round(rating) ? "#059669" : "none"}
+          stroke={i < Math.round(rating) ? "#059669" : "#d1d5db"}
+          className="h-3.5 w-3.5"
+        >
+          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+        </svg>
+      ))}
+    </span>
+  );
+}
+
+export default async function ReviewsPage() {
+  const [{ data: trusts }, { data: reviews }] = await Promise.all([
+    supabase
+      .from("trusts")
+      .select("id, name")
+      .order("name", { ascending: true }),
+    supabase
+      .from("trust_reviews")
+      .select("id, trust_id, grade, specialty, rota_rating, training_rating, culture_rating, overall_rating, review_text, created_at, trusts(name)")
+      .order("created_at", { ascending: false })
+      .limit(50),
+  ]);
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <Navbar />
+
+      <div className="mx-auto max-w-3xl px-6 py-12">
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-2xl font-bold text-gray-900">Trust Reviews</h1>
+          <p className="mt-2 text-sm text-gray-500">
+            Anonymous reviews from doctors about working conditions, training quality, and culture.
+            Help your colleagues make informed decisions.
+          </p>
+        </div>
+
+        {/* Submission form */}
+        <div className="mb-10 rounded-2xl bg-white p-7 ring-1 ring-gray-200">
+          <h2 className="mb-5 text-base font-semibold text-gray-900">Share your experience</h2>
+          <ReviewForm trusts={trusts ?? []} />
+        </div>
+
+        {/* Reviews list */}
+        <div>
+          <h2 className="mb-4 text-base font-semibold text-gray-900">
+            Recent reviews
+            {(reviews?.length ?? 0) > 0 && (
+              <span className="ml-2 text-sm font-normal text-gray-400">
+                ({reviews!.length})
+              </span>
+            )}
+          </h2>
+
+          {(reviews?.length ?? 0) === 0 ? (
+            <div className="rounded-2xl bg-white p-10 text-center ring-1 ring-gray-200">
+              <p className="text-sm font-medium text-gray-400">No reviews yet</p>
+              <p className="mt-1 text-xs text-gray-400">Be the first to share your experience.</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {reviews!.map((r) => {
+                const trustName = Array.isArray(r.trusts)
+                  ? r.trusts[0]?.name
+                  : (r.trusts as { name: string } | null)?.name;
+                const date = new Date(r.created_at).toLocaleDateString("en-GB", {
+                  day: "numeric", month: "short", year: "numeric",
+                });
+                return (
+                  <div key={r.id} className="rounded-xl bg-white p-5 ring-1 ring-gray-200">
+                    <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+                      <div>
+                        <p className="font-medium text-gray-900">{trustName ?? "NHS Trust"}</p>
+                        <div className="mt-1 flex flex-wrap gap-1.5">
+                          {r.grade && (
+                            <span className="rounded-md bg-gray-50 px-2 py-0.5 text-xs text-gray-600 ring-1 ring-gray-200">
+                              {r.grade}
+                            </span>
+                          )}
+                          {r.specialty && (
+                            <span className="rounded-md bg-gray-50 px-2 py-0.5 text-xs text-gray-600 ring-1 ring-gray-200">
+                              {r.specialty}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <span className="text-xs text-gray-400">{date}</span>
+                    </div>
+
+                    <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                      {[
+                        { label: "Overall", val: r.overall_rating },
+                        { label: "Training", val: r.training_rating },
+                        { label: "Rota", val: r.rota_rating },
+                        { label: "Culture", val: r.culture_rating },
+                      ].map(({ label, val }) => (
+                        <div key={label} className="rounded-lg bg-gray-50 px-3 py-2">
+                          <p className="text-[10px] font-medium uppercase tracking-wide text-gray-400">{label}</p>
+                          {val != null ? (
+                            <StarDisplay rating={val} />
+                          ) : (
+                            <p className="text-xs text-gray-300">—</p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+
+                    {r.review_text && (
+                      <p className="text-sm text-gray-600 leading-relaxed">{r.review_text}</p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

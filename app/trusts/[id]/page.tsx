@@ -101,6 +101,7 @@ export default async function TrustPage({
         "id, title, grade, specialty, region, salary_min, salary_max, closes_at, source, external_url",
       )
       .eq("trust_id", id)
+      .gte("closes_at", new Date().toISOString().slice(0, 10))
       .order("closes_at", { ascending: true }),
   ]);
 
