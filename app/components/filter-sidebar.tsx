@@ -82,7 +82,7 @@ function FilterSection({
   );
 }
 
-export default function FilterSidebar() {
+export default function FilterSidebar({ className }: { className?: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -133,7 +133,7 @@ export default function FilterSidebar() {
   const totalActive = Object.values(filters).reduce((n, v) => n + v.length, 0);
 
   return (
-    <div className="sticky top-20 flex max-h-[calc(100vh-5.5rem)] flex-col rounded-2xl bg-white ring-1 ring-gray-200">
+    <div className={className ?? "sticky top-20 flex max-h-[calc(100vh-5.5rem)] flex-col rounded-2xl bg-white ring-1 ring-gray-200"}>
       {/* Header */}
       <div className="flex flex-shrink-0 items-center justify-between border-b border-gray-100 px-5 py-4">
         <span className="text-sm font-semibold text-gray-900">

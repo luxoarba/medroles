@@ -5,6 +5,8 @@ import BookmarkButton from "../components/bookmark-button";
 import RefreshButton from "../components/refresh-button";
 import AutoScrape from "../components/auto-scrape";
 import SortSelect from "../components/sort-select";
+import SearchInput from "../components/search-input";
+import MobileFilterDrawer from "../components/mobile-filter-drawer";
 import { supabase, formatSalary, type DBJobListing } from "../lib/supabase";
 import { DEANERY_REGIONS } from "../lib/jobs";
 import FilterSidebar from "../components/filter-sidebar";
@@ -194,6 +196,7 @@ async function fetchJobs(
     specialty: string[];
     grade: string[];
     deanery: string[];
+    search: string;
   },
 ): Promise<DBJobListing[]> {
   let query = supabase
@@ -235,6 +238,10 @@ async function fetchJobs(
     }
   }
 
+  if (filters.search) {
+    query = query.ilike("title", `%${filters.search}%`);
+  }
+
   if (sort === "posted_at") {
     query = query.order("posted_at", { ascending: false });
   } else if (sort === "salary") {
@@ -273,14 +280,17 @@ export default async function JobsPage({
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
-  const { sort = "closes_at", specialty, grade, deanery } = await searchParams;
+  const { sort = "closes_at", specialty, grade, deanery, search } = await searchParams;
   const sortValue = Array.isArray(sort) ? sort[0] : sort;
+  const searchValue = Array.isArray(search) ? (search[0] ?? "") : (search ?? "");
   const filters = {
     specialty: toArray(specialty),
     grade: toArray(grade),
     deanery: toArray(deanery),
+    search: searchValue,
   };
-  const activeFilterCount = Object.values(filters).reduce((n, v) => n + v.length, 0);
+  const activeFilterCount =
+    filters.specialty.length + filters.grade.length + filters.deanery.length;
 
   const jobs = await fetchJobs(sortValue, filters);
 
@@ -298,25 +308,21 @@ export default async function JobsPage({
               Showing{" "}
               <span className="font-semibold text-emerald-600">{jobs.length}</span>{" "}
               live {jobs.length === 1 ? "role" : "roles"}
-              {activeFilterCount > 0 && (
+              {(activeFilterCount > 0 || searchValue) && (
                 <span className="ml-1.5 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
-                  {activeFilterCount} filter{activeFilterCount !== 1 ? "s" : ""} active
+                  {activeFilterCount + (searchValue ? 1 : 0)} filter{activeFilterCount + (searchValue ? 1 : 0) !== 1 ? "s" : ""} active
                 </span>
               )}
             </p>
           </div>
           <div className="flex items-center gap-2">
+            <Suspense fallback={null}>
+              <MobileFilterDrawer />
+            </Suspense>
             <RefreshButton />
-            <label className="flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm text-gray-600 ring-1 ring-gray-200">
-              <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
-              </svg>
-              <input
-                type="text"
-                placeholder="Search roles…"
-                className="w-48 bg-transparent outline-none placeholder-gray-400"
-              />
-            </label>
+            <Suspense fallback={<div className="flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm text-gray-300 ring-1 ring-gray-200 w-40 sm:w-52" />}>
+              <SearchInput />
+            </Suspense>
             <Suspense fallback={<div className="rounded-xl bg-white px-4 py-2.5 text-sm text-gray-300 ring-1 ring-gray-200">Sort…</div>}>
               <SortSelect />
             </Suspense>
