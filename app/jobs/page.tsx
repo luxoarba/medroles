@@ -356,9 +356,9 @@ export default async function JobsPage({
         <div className="flex gap-6">
           {/* Sidebar */}
           <aside className="hidden w-56 flex-shrink-0 lg:block">
-            <div className="space-y-4">
+            <div className="sticky top-20 flex max-h-[calc(100vh-5.5rem)] flex-col gap-4 overflow-y-auto pb-4">
               <Suspense fallback={<div className="rounded-2xl bg-white p-5 ring-1 ring-gray-200 h-96 animate-pulse" />}>
-                <FilterSidebar />
+                <FilterSidebar className="rounded-2xl bg-white ring-1 ring-gray-200 flex flex-col" />
               </Suspense>
               <Suspense fallback={null}>
                 <AlertSignup />
