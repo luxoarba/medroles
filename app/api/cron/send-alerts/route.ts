@@ -14,9 +14,9 @@ const BASE = "https://www.medroles.co.uk";
 type Alert = {
   id: string;
   email: string;
-  specialty: string | null;
-  grade: string | null;
-  region: string | null;
+  specialty: string[] | null;
+  grade: string[] | null;
+  region: string[] | null;
   unsubscribe_token: string;
 };
 
@@ -34,9 +34,9 @@ type Job = {
 };
 
 function matchesAlert(job: Job, alert: Alert): boolean {
-  if (alert.specialty && job.specialty !== alert.specialty) return false;
-  if (alert.grade && job.grade !== alert.grade) return false;
-  if (alert.region && job.region !== alert.region) return false;
+  if (alert.specialty?.length && !alert.specialty.includes(job.specialty ?? "")) return false;
+  if (alert.grade?.length && !alert.grade.includes(job.grade ?? "")) return false;
+  if (alert.region?.length && !alert.region.includes(job.region ?? "")) return false;
   return true;
 }
 
@@ -51,7 +51,11 @@ function formatSalary(min: number | null, max: number | null): string {
 function buildEmail(jobs: Job[], alert: Alert): string {
   const unsubUrl = `${BASE}/api/alerts/unsubscribe?token=${alert.unsubscribe_token}`;
 
-  const filterLine = [alert.specialty, alert.grade, alert.region]
+  const filterLine = [
+    alert.specialty?.join(", "),
+    alert.grade?.join(", "),
+    alert.region?.join(", "),
+  ]
     .filter(Boolean)
     .join(" · ");
 
@@ -92,7 +96,7 @@ function buildEmail(jobs: Job[], alert: Alert): string {
         ${jobs.length} new job${jobs.length !== 1 ? "s" : ""} posted in the last 24 hours:
       </p>
       ${jobCards}
-      <a href="${BASE}/jobs${alert.specialty ? `?specialty=${encodeURIComponent(alert.specialty)}` : ""}"
+      <a href="${BASE}/jobs${alert.specialty?.length === 1 ? `?specialty=${encodeURIComponent(alert.specialty[0])}` : ""}"
          style="display:inline-block;margin-top:8px;padding:12px 24px;background:#059669;color:#fff;border-radius:8px;font-size:14px;font-weight:600;text-decoration:none">
         View all matching jobs
       </a>

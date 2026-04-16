@@ -10,7 +10,12 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null);
   if (!body) return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
 
-  const { email, specialty, grade, region } = body as Record<string, string>;
+  const { email, specialty, grade, region } = body as {
+    email: string;
+    specialty: string[] | null;
+    grade: string[] | null;
+    region: string[] | null;
+  };
 
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return NextResponse.json({ error: "Valid email required" }, { status: 400 });
@@ -18,9 +23,9 @@ export async function POST(req: NextRequest) {
 
   const { error } = await supabaseAdmin.from("job_alerts").insert({
     email: email.toLowerCase().trim(),
-    specialty: specialty || null,
-    grade: grade || null,
-    region: region || null,
+    specialty: specialty?.length ? specialty : null,
+    grade: grade?.length ? grade : null,
+    region: region?.length ? region : null,
   });
 
   if (error) {
