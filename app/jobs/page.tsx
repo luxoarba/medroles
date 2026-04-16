@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import AlertSignup from "../components/alert-signup";
 import { Suspense } from "react";
 import Navbar from "../components/navbar";
 import BookmarkButton from "../components/bookmark-button";
@@ -355,9 +356,14 @@ export default async function JobsPage({
         <div className="flex gap-6">
           {/* Sidebar */}
           <aside className="hidden w-56 flex-shrink-0 lg:block">
-            <Suspense fallback={<div className="rounded-2xl bg-white p-5 ring-1 ring-gray-200 h-96 animate-pulse" />}>
-              <FilterSidebar />
-            </Suspense>
+            <div className="space-y-4">
+              <Suspense fallback={<div className="rounded-2xl bg-white p-5 ring-1 ring-gray-200 h-96 animate-pulse" />}>
+                <FilterSidebar />
+              </Suspense>
+              <Suspense fallback={null}>
+                <AlertSignup />
+              </Suspense>
+            </div>
           </aside>
 
           {/* Job cards */}
