@@ -366,6 +366,7 @@ export const SPECIALTIES = [
   "Gastroenterology",
   "General Practice",
   "General Surgery",
+  "Geriatric Medicine",
   "Haematology",
   "Neurology",
   "Neurosurgery",
