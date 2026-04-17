@@ -113,9 +113,9 @@ function CqcDomain({ label, rating }: { label: string; rating: string | null }) 
 }
 
 function daysUntil(dateStr: string) {
-  return Math.round(
-    (new Date(dateStr).getTime() - Date.now()) / (1000 * 60 * 60 * 24),
-  );
+  const todayMs = new Date(new Date().toISOString().slice(0, 10)).getTime();
+  const closingMs = new Date(dateStr).getTime();
+  return Math.round((closingMs - todayMs) / (1000 * 60 * 60 * 24));
 }
 
 export default async function TrustPage({
@@ -326,7 +326,7 @@ export default async function TrustPage({
                           days <= 7 ? "text-red-600" : days <= 14 ? "text-amber-600" : "text-gray-400"
                         }`}
                       >
-                        {days <= 0 ? "Closed" : `${days}d left`}
+                        {days === 0 ? "Closes today" : days < 0 ? "Closed" : `${days}d left`}
                       </span>
                     )}
                   </Link>
