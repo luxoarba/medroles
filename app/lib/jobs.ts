@@ -363,6 +363,7 @@ export const SPECIALTIES = [
   "Critical Care",
   "Dermatology",
   "Emergency Medicine",
+  "ENT",
   "Gastroenterology",
   "General Practice",
   "General Surgery",
