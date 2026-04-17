@@ -41,7 +41,7 @@ export default function AuthPage() {
     setSuccess(null);
     setLoading(true);
 
-    const { error: authError } =
+    const result =
       mode === "signup"
         ? await signUp(email, password)
         : await signIn(email, password);
@@ -50,8 +50,13 @@ export default function AuthPage() {
 
     setLoading(false);
 
-    if (authError) {
-      setError(authError.message ?? "Something went wrong. Please try again.");
+    if (result.error) {
+      setError(result.error.message ?? "Something went wrong. Please try again.");
+      return;
+    }
+
+    if (mode === "signup" && !result.data.session) {
+      setSuccess("Account created! Check your inbox and click the confirmation link before signing in.");
       return;
     }
 
