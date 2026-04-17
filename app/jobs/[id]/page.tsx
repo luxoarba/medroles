@@ -407,30 +407,33 @@ export default async function JobDetailPage({
               </div>
 
               {/* Trust rating card */}
-              {trust?.avg_rating && (
+              {trust && (
               <div className="rounded-2xl bg-white p-6 ring-1 ring-gray-200">
                 <h3 className="mb-4 text-sm font-semibold text-gray-900">
                   Trust rating
                 </h3>
 
-                {/* Overall */}
-                <div className="mb-5 text-center">
-                  <p className="text-5xl font-bold text-gray-900">
-                    {trust.avg_rating.toFixed(1)}
-                  </p>
-                  <StarRating rating={trust.avg_rating} size="md" />
-                  {trust.review_count && (
-                    <p className="mt-1 text-xs text-gray-400">
-                      {trust.review_count} doctor reviews
+                {trust.review_count && trust.review_count > 0 && trust.avg_rating ? (
+                  <div className="mb-5 text-center">
+                    <p className="text-5xl font-bold text-gray-900">
+                      {trust.avg_rating.toFixed(1)}
                     </p>
-                  )}
-                </div>
+                    <StarRating rating={trust.avg_rating} size="md" />
+                    <p className="mt-1 text-xs text-gray-400">
+                      {trust.review_count} doctor {trust.review_count === 1 ? "review" : "reviews"}
+                    </p>
+                  </div>
+                ) : (
+                  <p className="mb-4 text-sm text-gray-400">
+                    No reviews yet for this trust.
+                  </p>
+                )}
 
                 <Link
                   href={job.trust_id ? `/reviews?trust_id=${job.trust_id}` : "/reviews"}
-                  className="mt-4 block text-center text-xs font-medium text-emerald-600 hover:text-emerald-700 transition-colors"
+                  className="block text-center text-xs font-medium text-emerald-600 hover:text-emerald-700 transition-colors"
                 >
-                  {trust.review_count ? `Read all ${trust.review_count} reviews →` : "Leave a review →"}
+                  {trust.review_count && trust.review_count > 0 ? `Read all ${trust.review_count} reviews →` : "Be the first to review →"}
                 </Link>
               </div>
               )}
