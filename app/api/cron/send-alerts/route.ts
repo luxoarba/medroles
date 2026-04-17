@@ -112,9 +112,9 @@ function buildEmail(jobs: Job[], alert: Alert): string {
 }
 
 export async function POST(req: NextRequest) {
-  // Verify cron secret
-  const secret = req.headers.get("x-cron-secret");
-  if (secret !== process.env.CRON_SECRET) {
+  // Vercel cron sends: Authorization: Bearer <CRON_SECRET>
+  const auth = req.headers.get("authorization");
+  if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
