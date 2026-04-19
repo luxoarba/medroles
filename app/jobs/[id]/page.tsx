@@ -216,7 +216,7 @@ export default async function JobDetailPage({
         </nav>
       </div>
 
-      <div className="mx-auto max-w-7xl px-6 py-10">
+      <div className="mx-auto max-w-7xl px-6 py-8 pb-24 lg:pb-0">
         <div className="flex flex-col gap-8 lg:flex-row">
           {/* Main content */}
           <article className="min-w-0 flex-1">
@@ -374,8 +374,8 @@ export default async function JobDetailPage({
           {/* Sidebar */}
           <aside className="w-full lg:w-72 xl:w-80">
             <div className="sticky top-20 space-y-5">
-              {/* Apply card */}
-              <div className="rounded-2xl bg-white p-6 ring-1 ring-gray-200">
+              {/* Apply card — hidden on mobile (sticky bar used instead) */}
+              <div className="hidden lg:block rounded-2xl bg-white p-6 ring-1 ring-gray-200">
                 {closing && (
                   <div
                     className={`mb-4 rounded-xl px-4 py-3 text-center text-sm font-medium ${
@@ -503,6 +503,30 @@ export default async function JobDetailPage({
           </aside>
         </div>
       </div>
+
+      {/* Sticky apply bar — mobile only */}
+      {job.external_url && (
+        <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-gray-200 bg-white px-4 py-3 shadow-lg lg:hidden"
+          style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
+        >
+          <div className="mx-auto flex max-w-7xl items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-gray-900">{job.title}</p>
+              {trust?.name && (
+                <p className="truncate text-xs text-gray-500">{trust.name}</p>
+              )}
+            </div>
+            <a
+              href={job.external_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-shrink-0 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 transition-colors"
+            >
+              Apply
+            </a>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
