@@ -30,7 +30,7 @@ export default function SearchInput() {
   }
 
   return (
-    <label className="flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm text-gray-600 ring-1 ring-gray-200 focus-within:ring-emerald-400 transition-shadow">
+    <label className="flex w-full items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm text-gray-600 ring-1 ring-gray-200 focus-within:ring-emerald-400 transition-shadow">
       <svg
         className="h-4 w-4 flex-shrink-0 text-gray-400"
         fill="none"
@@ -49,7 +49,7 @@ export default function SearchInput() {
         value={value}
         onChange={handleChange}
         placeholder="Search roles…"
-        className="w-40 bg-transparent outline-none placeholder-gray-400 sm:w-48"
+        className="min-w-0 flex-1 bg-transparent outline-none placeholder-gray-400"
       />
       {value && (
         <button
