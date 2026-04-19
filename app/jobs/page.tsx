@@ -371,7 +371,7 @@ export default async function JobsPage({
           </div>
         </div>
 
-        <div className="flex gap-6">
+        <div className="lg:flex lg:gap-6">
           {/* Sidebar */}
           <aside className="hidden w-56 flex-shrink-0 lg:block">
             <div className="sticky top-20 flex max-h-[calc(100vh-5.5rem)] flex-col gap-4 overflow-y-auto pb-4">
