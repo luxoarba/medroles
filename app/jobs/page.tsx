@@ -147,7 +147,7 @@ function JobCard({ job }: { job: DBJobListing }) {
         )}
       </div>
 
-      {/* Meta */}
+      {/* Meta — region always shown; salary + rating hidden on mobile */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-gray-500">
         {job.region && (
           <span className="flex items-center gap-1">
@@ -158,38 +158,34 @@ function JobCard({ job }: { job: DBJobListing }) {
           </span>
         )}
         {salary && (
-          <span className="flex items-center gap-1">
+          <span className="hidden items-center gap-1 sm:flex">
             <svg className="h-3.5 w-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75" />
             </svg>
             {salary}
           </span>
         )}
-        {rating !== null && <StarRating rating={rating} />}
+        {rating !== null && <span className="hidden sm:block"><StarRating rating={rating} /></span>}
       </div>
 
       {/* Footer */}
-      {(closing !== null || job.source) && (
+      {closing !== null && days !== null && (
         <div className="mt-3 flex items-center justify-between border-t border-gray-100 pt-3 sm:mt-4 sm:pt-4">
-          {closing !== null && days !== null ? (
-            <span
-              className={`text-xs font-medium ${
-                days <= 7
-                  ? "text-red-600"
-                  : days <= 14
-                    ? "text-amber-600"
-                    : "text-gray-400"
-              }`}
-            >
-              {days <= 7 ? "⚠ " : ""}
-              {days === 0 ? "Closes today" : `Closes ${closing}`}
-              {days > 0 ? ` · ${days}d left` : days < 0 ? " · Closed" : ""}
-            </span>
-          ) : (
-            <span />
-          )}
+          <span
+            className={`text-xs font-medium ${
+              days <= 7
+                ? "text-red-600"
+                : days <= 14
+                  ? "text-amber-600"
+                  : "text-gray-400"
+            }`}
+          >
+            {days <= 7 ? "⚠ " : ""}
+            {days === 0 ? "Closes today" : `Closes ${closing}`}
+            {days > 0 ? ` · ${days}d left` : days < 0 ? " · Closed" : ""}
+          </span>
           {job.source && (
-            <span className="text-xs text-gray-400">{job.source}</span>
+            <span className="hidden text-xs text-gray-400 sm:block">{job.source}</span>
           )}
         </div>
       )}

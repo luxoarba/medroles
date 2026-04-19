@@ -1,19 +1,19 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 export default function MobileNavDrawer() {
   const [open, setOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const pathname = usePathname();
 
-  // Close on route change
-  useEffect(() => {
-    setOpen(false);
-  }, [pathname]);
+  useEffect(() => { setMounted(true); }, []);
 
-  // Lock body scroll while open
+  useEffect(() => { setOpen(false); }, [pathname]);
+
   useEffect(() => {
     document.body.style.overflow = open ? "hidden" : "";
     return () => { document.body.style.overflow = ""; };
@@ -25,6 +25,84 @@ export default function MobileNavDrawer() {
     { href: "/reviews", label: "Reviews" },
     { href: "/interview-intel", label: "Interview Intel" },
   ];
+
+  const overlay = (
+    <div style={{ position: "fixed", inset: 0, zIndex: 9999 }}>
+      {/* Backdrop */}
+      <div
+        style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.5)" }}
+        onClick={() => setOpen(false)}
+      />
+
+      {/* Drawer panel */}
+      <div style={{
+        position: "absolute", right: 0, top: 0, bottom: 0,
+        width: "75%", maxWidth: "320px",
+        background: "#ffffff", boxShadow: "0 25px 50px rgba(0,0,0,0.25)",
+        display: "flex", flexDirection: "column",
+      }}>
+        {/* Header */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid #f3f4f6", padding: "16px 20px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <span style={{ display: "flex", height: "28px", width: "28px", alignItems: "center", justifyContent: "center", borderRadius: "50%", background: "#059669" }}>
+              <span style={{ height: "10px", width: "10px", borderRadius: "50%", background: "rgba(255,255,255,0.9)", display: "block" }} />
+            </span>
+            <span style={{ fontSize: "15px", fontWeight: 600, color: "#111827" }}>
+              Med<span style={{ color: "#059669" }}>Roles</span>
+            </span>
+          </div>
+          <button
+            type="button"
+            aria-label="Close menu"
+            onClick={() => setOpen(false)}
+            style={{ display: "flex", height: "32px", width: "32px", alignItems: "center", justifyContent: "center", borderRadius: "8px", background: "none", border: "none", cursor: "pointer", color: "#9ca3af" }}
+          >
+            <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Nav links */}
+        <nav style={{ flex: 1, padding: "12px" }}>
+          {links.map(({ href, label }) => {
+            const isActive = pathname === href || pathname.startsWith(href + "/");
+            return (
+              <Link
+                key={href}
+                href={href}
+                style={{
+                  display: "flex", alignItems: "center",
+                  padding: "12px 16px", borderRadius: "12px",
+                  fontSize: "15px", fontWeight: 500, textDecoration: "none",
+                  marginBottom: "4px",
+                  color: isActive ? "#059669" : "#374151",
+                  background: isActive ? "#ecfdf5" : "transparent",
+                }}
+              >
+                {label}
+              </Link>
+            );
+          })}
+        </nav>
+
+        {/* Sign in */}
+        <div style={{ borderTop: "1px solid #f3f4f6", padding: "12px" }}>
+          <Link
+            href="/auth"
+            style={{
+              display: "flex", alignItems: "center",
+              padding: "12px 16px", borderRadius: "12px",
+              fontSize: "15px", fontWeight: 500, textDecoration: "none",
+              color: "#374151",
+            }}
+          >
+            Sign in / My account
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <>
@@ -40,67 +118,7 @@ export default function MobileNavDrawer() {
         </svg>
       </button>
 
-      {open && (
-        <div className="fixed inset-0 z-50 sm:hidden">
-          {/* Backdrop */}
-          <div
-            className="absolute inset-0 bg-black/50"
-            onClick={() => setOpen(false)}
-          />
-
-          {/* Drawer panel */}
-          <div className="absolute right-0 top-0 bottom-0 z-10 w-3/4 max-w-xs bg-white shadow-2xl flex flex-col">
-            {/* Header */}
-            <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
-              <div className="flex items-center gap-2.5">
-                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-600">
-                  <span className="h-2.5 w-2.5 rounded-full bg-white/90" />
-                </span>
-                <span className="text-[15px] font-semibold tracking-tight text-gray-900">
-                  Med<span className="text-emerald-600">Roles</span>
-                </span>
-              </div>
-              <button
-                type="button"
-                aria-label="Close menu"
-                onClick={() => setOpen(false)}
-                className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 transition-colors"
-              >
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            {/* Nav links */}
-            <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
-              {links.map(({ href, label }) => (
-                <Link
-                  key={href}
-                  href={href}
-                  className={`flex items-center rounded-xl px-4 py-3 text-sm font-medium transition-colors ${
-                    pathname === href || pathname.startsWith(href + "/")
-                      ? "bg-emerald-50 text-emerald-700"
-                      : "text-gray-700 hover:bg-gray-50"
-                  }`}
-                >
-                  {label}
-                </Link>
-              ))}
-            </nav>
-
-            {/* Auth link at bottom */}
-            <div className="border-t border-gray-100 px-3 py-4">
-              <Link
-                href="/auth"
-                className="flex items-center rounded-xl px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-              >
-                Sign in / My account
-              </Link>
-            </div>
-          </div>
-        </div>
-      )}
+      {mounted && open && createPortal(overlay, document.body)}
     </>
   );
 }
