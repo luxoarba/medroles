@@ -325,30 +325,52 @@ export default async function JobsPage({
 
       <div className="mx-auto max-w-7xl px-6 py-8">
         {/* Page header */}
-        <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">NHS Jobs</h1>
-            <p className="mt-1 text-sm text-gray-500">
-              Showing{" "}
-              <span className="font-semibold text-emerald-600">{jobs.length}</span>{" "}
-              live {jobs.length === 1 ? "role" : "roles"}
-              {(activeFilterCount > 0 || searchValue) && (
-                <span className="ml-1.5 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
-                  {activeFilterCount + (searchValue ? 1 : 0)} filter{activeFilterCount + (searchValue ? 1 : 0) !== 1 ? "s" : ""} active
-                </span>
-              )}
-            </p>
+        <div className="mb-8">
+          {/* Row 1: title + mobile controls / desktop all-controls */}
+          <div className="flex items-start justify-between gap-3 sm:items-center">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">NHS Jobs</h1>
+              <p className="mt-1 text-sm text-gray-500">
+                Showing{" "}
+                <span className="font-semibold text-emerald-600">{jobs.length}</span>{" "}
+                live {jobs.length === 1 ? "role" : "roles"}
+                {(activeFilterCount > 0 || searchValue) && (
+                  <span className="ml-1.5 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                    {activeFilterCount + (searchValue ? 1 : 0)} filter{activeFilterCount + (searchValue ? 1 : 0) !== 1 ? "s" : ""} active
+                  </span>
+                )}
+              </p>
+            </div>
+
+            {/* Mobile: Filters + Sort only */}
+            <div className="flex items-center gap-2 sm:hidden">
+              <Suspense fallback={null}>
+                <MobileFilterDrawer />
+              </Suspense>
+              <Suspense fallback={<div className="rounded-xl bg-white px-4 py-2.5 text-sm text-gray-300 ring-1 ring-gray-200">Sort…</div>}>
+                <SortSelect />
+              </Suspense>
+            </div>
+
+            {/* Desktop: all controls in one row */}
+            <div className="hidden items-center gap-2 sm:flex">
+              <Suspense fallback={null}>
+                <MobileFilterDrawer />
+              </Suspense>
+              <RefreshButton />
+              <Suspense fallback={<div className="flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm text-gray-300 ring-1 ring-gray-200 w-52" />}>
+                <SearchInput />
+              </Suspense>
+              <Suspense fallback={<div className="rounded-xl bg-white px-4 py-2.5 text-sm text-gray-300 ring-1 ring-gray-200">Sort…</div>}>
+                <SortSelect />
+              </Suspense>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Suspense fallback={null}>
-              <MobileFilterDrawer />
-            </Suspense>
-            <RefreshButton />
-            <Suspense fallback={<div className="flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm text-gray-300 ring-1 ring-gray-200 w-40 sm:w-52" />}>
+
+          {/* Row 2: full-width search — mobile only */}
+          <div className="mt-3 sm:hidden">
+            <Suspense fallback={<div className="flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm text-gray-300 ring-1 ring-gray-200 w-full" />}>
               <SearchInput />
-            </Suspense>
-            <Suspense fallback={<div className="rounded-xl bg-white px-4 py-2.5 text-sm text-gray-300 ring-1 ring-gray-200">Sort…</div>}>
-              <SortSelect />
             </Suspense>
           </div>
         </div>
