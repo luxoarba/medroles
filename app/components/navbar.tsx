@@ -1,5 +1,6 @@
 import Link from "next/link";
 import NavbarAuth from "./navbar-auth";
+import MobileNavDrawer from "./mobile-nav-drawer";
 
 export default function Navbar() {
   return (
@@ -16,37 +17,26 @@ export default function Navbar() {
           </span>
         </Link>
 
-        {/* Nav links */}
+        {/* Nav links — desktop only */}
         <div className="hidden items-center gap-1 sm:flex">
-          <Link
-            href="/jobs"
-            className="rounded-lg px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors"
-          >
+          <Link href="/jobs" className="rounded-lg px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors">
             Browse Jobs
           </Link>
-          <Link
-            href="/trusts"
-            className="rounded-lg px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors"
-          >
+          <Link href="/trusts" className="rounded-lg px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors">
             Trusts
           </Link>
-          <Link
-            href="/reviews"
-            className="rounded-lg px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors"
-          >
+          <Link href="/reviews" className="rounded-lg px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors">
             Reviews
           </Link>
-          <Link
-            href="/interview-intel"
-            className="rounded-lg px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors"
-          >
+          <Link href="/interview-intel" className="rounded-lg px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors">
             Interview Intel
           </Link>
         </div>
 
-        {/* CTAs */}
+        {/* Right side: auth + mobile hamburger */}
         <div className="flex items-center gap-2">
           <NavbarAuth />
+          <MobileNavDrawer />
         </div>
       </div>
     </nav>
