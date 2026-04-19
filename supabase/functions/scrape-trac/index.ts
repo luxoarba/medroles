@@ -485,7 +485,7 @@ Deno.serve(async () => {
       return {
         title: job.title,
         trust_id: trustMap.get(trustName) ?? null,
-        region: detail?.location ?? job.location,
+        region: (detail?.location ?? job.location)?.replace(/<[^>]+>/g, "").trim() || null,
         grade: detail?.grade ?? inferGrade(job.title),
         specialty: inferSpecialty(job.title),
         contract_type: detail?.contractType ?? null,
