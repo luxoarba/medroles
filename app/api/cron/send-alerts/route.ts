@@ -125,9 +125,9 @@ export async function POST(req: NextRequest) {
     supabaseAdmin
       .from("job_listings")
       .select("id, title, specialty, grade, region, salary_min, salary_max, closes_at, posted_at, trusts(name)")
-      .gte("posted_at", since)
+      .gte("created_at", since)
       .gte("closes_at", new Date().toISOString().slice(0, 10))
-      .order("posted_at", { ascending: false }),
+      .order("created_at", { ascending: false }),
     supabaseAdmin
       .from("job_alerts")
       .select("id, email, specialty, grade, region, unsubscribe_token"),
