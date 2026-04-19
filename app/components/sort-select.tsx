@@ -2,9 +2,9 @@
 import { useRouter, useSearchParams } from "next/navigation";
 
 const OPTIONS = [
-  { label: "Sort: Closing soonest", value: "closes_at" },
+  { label: "Closing soonest", value: "closes_at" },
   { label: "Most recent", value: "posted_at" },
-  { label: "Salary: High to low", value: "salary" },
+  { label: "Highest salary", value: "salary" },
 ];
 
 export default function SortSelect() {

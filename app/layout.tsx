@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -12,9 +12,35 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+};
+
 export const metadata: Metadata = {
-  title: "MedRoles — NHS Jobs for Doctors",
-  description: "Doctor-specific NHS job board with trust reviews and interview intel.",
+  metadataBase: new URL("https://www.medroles.co.uk"),
+  title: {
+    default: "MedRoles — NHS Doctor Jobs",
+    template: "%s | MedRoles",
+  },
+  description:
+    "Find NHS doctor jobs across the UK. Browse consultant, registrar, clinical fellow and GP roles with trust reviews, CQC ratings and interview intel.",
+  keywords: ["NHS jobs", "doctor jobs", "consultant jobs", "registrar jobs", "clinical fellow", "GP jobs", "NHS careers"],
+  openGraph: {
+    type: "website",
+    siteName: "MedRoles",
+    locale: "en_GB",
+    url: "https://www.medroles.co.uk",
+    title: "MedRoles — NHS Doctor Jobs",
+    description:
+      "Find NHS doctor jobs across the UK. Browse consultant, registrar, clinical fellow and GP roles with trust reviews, CQC ratings and interview intel.",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "MedRoles — NHS Doctor Jobs",
+    description: "Find NHS doctor jobs across the UK.",
+  },
+  robots: { index: true, follow: true },
 };
 
 export default function RootLayout({

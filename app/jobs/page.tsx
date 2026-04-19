@@ -88,10 +88,10 @@ function JobCard({ job }: { job: DBJobListing }) {
     : null;
 
   return (
-    <div className="group relative rounded-2xl bg-white p-6 ring-1 ring-gray-200 hover:ring-emerald-300 hover:shadow-md transition-all duration-150">
+    <div className="group relative rounded-xl bg-white p-4 ring-1 ring-gray-200 hover:ring-emerald-300 hover:shadow-md transition-all duration-150 sm:rounded-2xl sm:p-6">
       <Link href={`/jobs/${job.id}`} className="absolute inset-0 rounded-2xl" aria-label={job.title} />
       {/* Header */}
-      <div className="mb-3 flex items-start justify-between gap-3">
+      <div className="mb-2 flex items-start justify-between gap-3 sm:mb-3">
         <div className="min-w-0">
           <h2 className="truncate text-[15px] font-semibold text-gray-900 group-hover:text-emerald-700 transition-colors">
             {job.title}
@@ -115,7 +115,7 @@ function JobCard({ job }: { job: DBJobListing }) {
       </div>
 
       {/* Tags */}
-      <div className="mb-4 flex flex-wrap gap-1.5">
+      <div className="mb-3 flex flex-wrap gap-1.5">
         {grade && (
           <span
             className={`rounded-md px-2 py-0.5 text-xs font-medium ring-1 ${
@@ -170,7 +170,7 @@ function JobCard({ job }: { job: DBJobListing }) {
 
       {/* Footer */}
       {(closing !== null || job.source) && (
-        <div className="mt-4 flex items-center justify-between border-t border-gray-100 pt-4">
+        <div className="mt-3 flex items-center justify-between border-t border-gray-100 pt-3 sm:mt-4 sm:pt-4">
           {closing !== null && days !== null ? (
             <span
               className={`text-xs font-medium ${
@@ -323,7 +323,7 @@ export default async function JobsPage({
       <AutoScrape />
       <Navbar />
 
-      <div className="mx-auto max-w-7xl px-6 py-8">
+      <div className="mx-auto max-w-7xl px-4 py-5 sm:px-6 sm:py-8">
         {/* Page header */}
         <div className="mb-8">
           {/* Row 1: title + mobile controls / desktop all-controls */}

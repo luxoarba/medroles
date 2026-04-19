@@ -44,12 +44,12 @@ export default function MobileNavDrawer() {
         <div className="fixed inset-0 z-50 sm:hidden">
           {/* Backdrop */}
           <div
-            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            className="absolute inset-0 bg-black/50"
             onClick={() => setOpen(false)}
           />
 
           {/* Drawer panel */}
-          <div className="absolute right-0 top-0 bottom-0 w-3/4 max-w-xs bg-white shadow-2xl flex flex-col">
+          <div className="absolute right-0 top-0 bottom-0 z-10 w-3/4 max-w-xs bg-white shadow-2xl flex flex-col">
             {/* Header */}
             <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
               <div className="flex items-center gap-2.5">
