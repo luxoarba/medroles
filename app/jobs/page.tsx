@@ -91,58 +91,50 @@ function JobCard({ job }: { job: DBJobListing }) {
     <div className="group relative rounded-xl bg-white px-4 py-3 ring-1 ring-gray-200 hover:ring-emerald-300 hover:shadow-md transition-all duration-150 sm:rounded-2xl sm:p-6">
       <Link href={`/jobs/${job.id}`} className="absolute inset-0 rounded-xl sm:rounded-2xl" aria-label={job.title} />
 
-      {/* Title + bookmark */}
+      {/* Header */}
       <div className="flex items-start justify-between gap-2">
-        <h2 className="min-w-0 truncate text-[14px] font-semibold text-gray-900 group-hover:text-emerald-700 transition-colors sm:text-[15px]">
-          {job.title}
-        </h2>
+        <div className="min-w-0">
+          <h2 className="truncate text-[14px] font-semibold text-gray-900 group-hover:text-emerald-700 transition-colors sm:text-[15px]">
+            {job.title}
+          </h2>
+          {job.trust_id ? (
+            <Link
+              href={`/trusts/${job.trust_id}`}
+              className="relative z-10 block truncate text-xs text-gray-500 hover:text-emerald-600 hover:underline sm:mt-0.5 sm:text-sm"
+            >
+              {trust?.name ?? "NHS Trust"}
+            </Link>
+          ) : (
+            <p className="truncate text-xs text-gray-500 sm:mt-0.5 sm:text-sm">
+              {trust?.name ?? "NHS Trust"}
+            </p>
+          )}
+        </div>
         <div className="relative z-10 flex-shrink-0">
           <BookmarkButton jobId={job.id} />
         </div>
       </div>
 
-      {/* Trust · location · closing — one compact line */}
-      <p className="mt-0.5 truncate text-[12px] text-gray-500 sm:hidden">
-        {[
-          trust?.name ?? "NHS Trust",
-          job.region,
-          closing !== null && days !== null
-            ? (days === 0 ? "Closes today" : days < 0 ? "Closed" : `${days}d left`)
-            : null,
-        ].filter(Boolean).join(" · ")}
-      </p>
-
-      {/* Desktop: trust name on its own line */}
-      {job.trust_id ? (
-        <Link href={`/trusts/${job.trust_id}`} className="relative z-10 mt-0.5 hidden truncate text-sm text-gray-500 hover:text-emerald-600 hover:underline sm:block">
-          {trust?.name ?? "NHS Trust"}
-        </Link>
-      ) : (
-        <p className="mt-0.5 hidden truncate text-sm text-gray-500 sm:block">
-          {trust?.name ?? "NHS Trust"}
-        </p>
-      )}
-
-      {/* Tags — no-wrap on mobile, wrap on desktop */}
-      <div className="mt-1.5 flex gap-1 overflow-hidden sm:mt-3 sm:flex-wrap sm:gap-1.5">
+      {/* Tags */}
+      <div className="mt-2 flex flex-wrap gap-1 sm:gap-1.5">
         {grade && (
-          <span className={`flex-shrink-0 rounded px-1.5 py-0.5 text-[11px] font-medium ring-1 sm:rounded-md sm:px-2 sm:text-xs ${GRADE_COLOURS[grade] ?? "bg-gray-50 text-gray-600 ring-gray-200"}`}>
+          <span className={`rounded px-1.5 py-0.5 text-[11px] font-medium ring-1 sm:rounded-md sm:px-2 sm:text-xs ${GRADE_COLOURS[grade] ?? "bg-gray-50 text-gray-600 ring-gray-200"}`}>
             {grade}
           </span>
         )}
         {job.specialty && (
-          <span className="flex-shrink-0 rounded bg-gray-50 px-1.5 py-0.5 text-[11px] font-medium text-gray-600 ring-1 ring-gray-200 sm:rounded-md sm:px-2 sm:text-xs">
+          <span className="rounded bg-gray-50 px-1.5 py-0.5 text-[11px] font-medium text-gray-600 ring-1 ring-gray-200 sm:rounded-md sm:px-2 sm:text-xs">
             {job.specialty}
-          </span>
-        )}
-        {job.training_post && (
-          <span className="flex-shrink-0 rounded bg-teal-50 px-1.5 py-0.5 text-[11px] font-medium text-teal-700 ring-1 ring-teal-200 sm:rounded-md sm:px-2 sm:text-xs">
-            Training
           </span>
         )}
         {contractLabel && (
           <span className="hidden rounded-md bg-gray-50 px-2 py-0.5 text-xs font-medium text-gray-600 ring-1 ring-gray-200 sm:inline">
             {contractLabel}
+          </span>
+        )}
+        {job.training_post && (
+          <span className="rounded bg-teal-50 px-1.5 py-0.5 text-[11px] font-medium text-teal-700 ring-1 ring-teal-200 sm:rounded-md sm:px-2 sm:text-xs">
+            Training post
           </span>
         )}
         {job.on_call && (
@@ -152,34 +144,25 @@ function JobCard({ job }: { job: DBJobListing }) {
         )}
       </div>
 
-      {/* Desktop-only: region / salary / rating / closing footer */}
-      <div className="mt-3 hidden items-center gap-x-4 gap-y-1.5 text-xs text-gray-500 sm:flex sm:flex-wrap">
+      {/* Bottom row: region + closing — single line on mobile */}
+      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500 sm:mt-3">
         {job.region && (
           <span className="flex items-center gap-1">
-            <svg className="h-3.5 w-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+            <svg className="h-3 w-3 text-gray-400 sm:h-3.5 sm:w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0zM19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
             </svg>
             {job.region}
           </span>
         )}
-        {salary && (
-          <span className="flex items-center gap-1">
-            <svg className="h-3.5 w-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75" />
-            </svg>
-            {salary}
+        {closing !== null && days !== null && (
+          <span className={`font-medium ${days <= 7 ? "text-red-600" : days <= 14 ? "text-amber-600" : "text-gray-400"}`}>
+            {days <= 7 ? "⚠ " : ""}
+            {days === 0 ? "Closes today" : `${days}d left`}
           </span>
         )}
-        {rating !== null && <StarRating rating={rating} />}
+        {salary && <span className="hidden sm:inline">{salary}</span>}
+        {rating !== null && <span className="hidden sm:block"><StarRating rating={rating} /></span>}
       </div>
-      {closing !== null && days !== null && (
-        <div className="mt-3 hidden items-center justify-between border-t border-gray-100 pt-3 sm:flex">
-          <span className={`text-xs font-medium ${days <= 7 ? "text-red-600" : days <= 14 ? "text-amber-600" : "text-gray-400"}`}>
-            {days <= 7 ? "⚠ " : ""}{days === 0 ? "Closes today" : `Closes ${closing}`}{days > 0 ? ` · ${days}d left` : days < 0 ? " · Closed" : ""}
-          </span>
-          {job.source && <span className="text-xs text-gray-400">{job.source}</span>}
-        </div>
-      )}
     </div>
   );
 }
