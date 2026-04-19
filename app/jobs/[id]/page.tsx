@@ -109,15 +109,25 @@ export default async function JobDetailPage({
 
   const trust = Array.isArray(job.trusts) ? job.trusts[0] : job.trusts;
 
-  // Fetch up to 3 interview insights for this trust to show in sidebar
-  const { data: insights } = job.trust_id
-    ? await supabase
-        .from("interview_insights")
-        .select("id, format, questions_asked, difficulty, got_offer")
-        .eq("trust_id", job.trust_id)
-        .order("created_at", { ascending: false })
-        .limit(3)
-    : { data: null };
+  // Fetch up to 3 interview insights and 2 recent reviews for this trust
+  const [{ data: insights }, { data: trustReviews }] = await Promise.all([
+    job.trust_id
+      ? supabase
+          .from("interview_insights")
+          .select("id, format, questions_asked, difficulty, got_offer")
+          .eq("trust_id", job.trust_id)
+          .order("created_at", { ascending: false })
+          .limit(3)
+      : { data: null },
+    job.trust_id
+      ? supabase
+          .from("trust_reviews")
+          .select("id, overall_rating, rota_rating, training_rating, culture_rating, review_text, grade, specialty, created_at")
+          .eq("trust_id", job.trust_id)
+          .order("created_at", { ascending: false })
+          .limit(2)
+      : { data: null },
+  ]);
 
   const closing = job.closes_at
     ? new Date(job.closes_at).toLocaleDateString("en-GB", {
@@ -409,32 +419,47 @@ export default async function JobDetailPage({
               {/* Trust rating card */}
               {trust && (
               <div className="rounded-2xl bg-white p-6 ring-1 ring-gray-200">
-                <h3 className="mb-4 text-sm font-semibold text-gray-900">
-                  Trust rating
-                </h3>
+                <h3 className="mb-4 text-sm font-semibold text-gray-900">Trust rating</h3>
 
-                {trust.review_count && trust.review_count > 0 && trust.avg_rating ? (
-                  <div className="mb-5 text-center">
-                    <p className="text-5xl font-bold text-gray-900">
-                      {trust.avg_rating.toFixed(1)}
-                    </p>
-                    <StarRating rating={trust.avg_rating} size="md" />
-                    <p className="mt-1 text-xs text-gray-400">
-                      {trust.review_count} doctor {trust.review_count === 1 ? "review" : "reviews"}
-                    </p>
-                  </div>
-                ) : (
-                  <p className="mb-4 text-sm text-gray-400">
-                    No reviews yet for this trust.
-                  </p>
+                {trustReviews && trustReviews.length > 0 ? (() => {
+                  const avg = trustReviews.reduce((s, r) => s + r.overall_rating, 0) / trustReviews.length;
+                  const snippet = trustReviews.find((r) => r.review_text);
+                  return (
+                    <>
+                      <div className="mb-4 text-center">
+                        <p className="text-4xl font-bold text-gray-900">{avg.toFixed(1)}</p>
+                        <StarRating rating={avg} size="md" />
+                      </div>
+                      {snippet && (
+                        <div className="mb-4 rounded-xl bg-gray-50 p-3">
+                          {(snippet.grade || snippet.specialty) && (
+                            <div className="mb-1.5 flex flex-wrap gap-1">
+                              {snippet.grade && <span className="rounded bg-white px-1.5 py-0.5 text-[10px] font-medium text-gray-500 ring-1 ring-gray-200">{snippet.grade}</span>}
+                              {snippet.specialty && <span className="rounded bg-white px-1.5 py-0.5 text-[10px] font-medium text-gray-500 ring-1 ring-gray-200">{snippet.specialty}</span>}
+                            </div>
+                          )}
+                          <p className="line-clamp-3 text-xs text-gray-600 leading-relaxed">{snippet.review_text}</p>
+                        </div>
+                      )}
+                      <Link
+                        href={job.trust_id ? `/reviews?trust_id=${job.trust_id}` : "/reviews"}
+                        className="block text-center text-xs font-medium text-emerald-600 hover:text-emerald-700 transition-colors"
+                      >
+                        See all reviews for this trust →
+                      </Link>
+                    </>
+                  );
+                })() : (
+                  <>
+                    <p className="mb-4 text-sm text-gray-400">No reviews yet for this trust.</p>
+                    <Link
+                      href={job.trust_id ? `/reviews?trust_id=${job.trust_id}` : "/reviews"}
+                      className="block text-center text-xs font-medium text-emerald-600 hover:text-emerald-700 transition-colors"
+                    >
+                      Be the first to review →
+                    </Link>
+                  </>
                 )}
-
-                <Link
-                  href={job.trust_id ? `/reviews?trust_id=${job.trust_id}` : "/reviews"}
-                  className="block text-center text-xs font-medium text-emerald-600 hover:text-emerald-700 transition-colors"
-                >
-                  {trust.review_count && trust.review_count > 0 ? `Read all ${trust.review_count} reviews →` : "Be the first to review →"}
-                </Link>
               </div>
               )}
 

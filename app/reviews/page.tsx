@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Navbar from "../components/navbar";
-import ReviewForm from "./review-form";
+import ReviewFormToggle from "./review-form-toggle";
 import { supabase } from "../lib/supabase";
 
 export const metadata: Metadata = {
@@ -11,13 +11,6 @@ export const metadata: Metadata = {
     description: "Anonymous reviews from doctors about working conditions, training quality and culture at NHS trusts.",
     url: "https://www.medroles.co.uk/reviews",
   },
-};
-
-const CQC_COLOURS: Record<string, string> = {
-  Outstanding: "text-amber-600",
-  Good: "text-emerald-600",
-  "Requires improvement": "text-orange-600",
-  Inadequate: "text-red-600",
 };
 
 function StarDisplay({ rating, max = 5 }: { rating: number; max?: number }) {
@@ -65,6 +58,8 @@ export default async function ReviewsPage({
       : Promise.resolve(null),
   ]);
 
+  const reviewCount = reviews?.length ?? 0;
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar />
@@ -86,32 +81,24 @@ export default async function ReviewsPage({
           </p>
         </div>
 
-        {/* Submission form */}
-        <div className="mb-10 rounded-2xl bg-white p-7 ring-1 ring-gray-200">
-          <h2 className="mb-5 text-base font-semibold text-gray-900">Share your experience</h2>
-          <ReviewForm trusts={trusts ?? []} defaultTrustId={trust_id} />
-        </div>
-
         {/* Reviews list */}
-        <div>
-          <h2 className="mb-4 text-base font-semibold text-gray-900">
-            Recent reviews
-            {(reviews?.length ?? 0) > 0 && (
-              <span className="ml-2 text-sm font-normal text-gray-400">
-                ({reviews!.length})
-              </span>
-            )}
-          </h2>
+        <div className="mb-6">
+          {reviewCount > 0 && (
+            <h2 className="mb-4 text-base font-semibold text-gray-900">
+              Reviews
+              <span className="ml-2 text-sm font-normal text-gray-400">({reviewCount})</span>
+            </h2>
+          )}
 
-          {(reviews?.length ?? 0) === 0 ? (
-            <div className="rounded-2xl bg-white p-10 text-center ring-1 ring-gray-200">
-              <p className="text-sm font-medium text-gray-400">No reviews yet</p>
+          {reviewCount === 0 ? (
+            <div className="mb-6 rounded-2xl bg-white p-10 text-center ring-1 ring-gray-200">
+              <p className="text-sm font-medium text-gray-500">No reviews yet</p>
               <p className="mt-1 text-xs text-gray-400">Be the first to share your experience.</p>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-4 mb-6">
               {reviews!.map((r) => {
-                const trustName = Array.isArray(r.trusts)
+                const rTrustName = Array.isArray(r.trusts)
                   ? r.trusts[0]?.name
                   : (r.trusts as { name: string } | null)?.name;
                 const date = new Date(r.created_at).toLocaleDateString("en-GB", {
@@ -121,7 +108,7 @@ export default async function ReviewsPage({
                   <div key={r.id} className="rounded-xl bg-white p-5 ring-1 ring-gray-200">
                     <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
                       <div>
-                        <p className="font-medium text-gray-900">{trustName ?? "NHS Trust"}</p>
+                        <p className="font-medium text-gray-900">{rTrustName ?? "NHS Trust"}</p>
                         <div className="mt-1 flex flex-wrap gap-1.5">
                           {r.grade && (
                             <span className="rounded-md bg-gray-50 px-2 py-0.5 text-xs text-gray-600 ring-1 ring-gray-200">
@@ -165,6 +152,9 @@ export default async function ReviewsPage({
             </div>
           )}
         </div>
+
+        {/* Leave a review CTA */}
+        <ReviewFormToggle trusts={trusts ?? []} defaultTrustId={trust_id} />
       </div>
     </div>
   );
