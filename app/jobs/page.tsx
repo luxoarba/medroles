@@ -12,6 +12,7 @@ import MobileFilterDrawer from "../components/mobile-filter-drawer";
 import { supabase, formatSalary, type DBJobListing } from "../lib/supabase";
 import { DEANERY_REGIONS } from "../lib/jobs";
 import FilterSidebar from "../components/filter-sidebar";
+import OverflowDebug from "../components/overflow-debug";
 
 export const metadata: Metadata = {
   title: "NHS Doctor Jobs",
@@ -316,6 +317,7 @@ export default async function JobsPage({
 
   return (
     <div className="min-h-screen bg-gray-50 overflow-x-hidden">
+      <OverflowDebug />
       <AutoScrape />
       <Navbar />
 
