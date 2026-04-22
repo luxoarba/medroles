@@ -7,14 +7,14 @@ const OPTIONS = [
   { label: "Salary", value: "salary" },
 ];
 
-export default function SortSelect() {
+export default function SortSelect({ className }: { className?: string }) {
   const router = useRouter();
   const params = useSearchParams();
   const current = params.get("sort") ?? "closes_at";
 
   return (
     <select
-      className="max-w-[120px] rounded-xl bg-white px-3 py-2.5 text-sm text-gray-600 ring-1 ring-gray-200 outline-none"
+      className={`rounded-xl bg-white px-3 py-2.5 text-sm text-gray-600 ring-1 ring-gray-200 outline-none${className ? ` ${className}` : ""}`}
       value={current}
       onChange={(e) => {
         const p = new URLSearchParams(params.toString());

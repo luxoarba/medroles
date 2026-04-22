@@ -367,9 +367,9 @@ export default async function JobsPage({
                 <SearchInput />
               </Suspense>
             </div>
-            <div className="flex-shrink-0">
-              <Suspense fallback={<div className="rounded-xl bg-white px-3 py-2.5 text-sm text-gray-300 ring-1 ring-gray-200">Sort…</div>}>
-                <SortSelect />
+            <div className="w-[100px] flex-shrink-0">
+              <Suspense fallback={<div className="w-full rounded-xl bg-white px-3 py-2.5 text-sm text-gray-300 ring-1 ring-gray-200">Sort…</div>}>
+                <SortSelect className="w-full" />
               </Suspense>
             </div>
           </div>
