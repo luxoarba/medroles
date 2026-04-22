@@ -14,7 +14,7 @@ export default function SortSelect() {
 
   return (
     <select
-      className="rounded-xl bg-white px-4 py-2.5 text-sm text-gray-600 ring-1 ring-gray-200 outline-none"
+      className="max-w-[120px] rounded-xl bg-white px-3 py-2.5 text-sm text-gray-600 ring-1 ring-gray-200 outline-none"
       value={current}
       onChange={(e) => {
         const p = new URLSearchParams(params.toString());
