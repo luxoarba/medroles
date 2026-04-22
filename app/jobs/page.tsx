@@ -315,7 +315,7 @@ export default async function JobsPage({
   const jobs = await fetchJobs(sortValue, filters);
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 overflow-x-hidden">
       <AutoScrape />
       <Navbar />
 
@@ -339,7 +339,7 @@ export default async function JobsPage({
             </div>
 
             {/* Mobile: Filters + Sort only */}
-            <div className="flex items-center gap-2 sm:hidden">
+            <div className="flex flex-shrink-0 items-center gap-2 sm:hidden">
               <Suspense fallback={null}>
                 <MobileFilterDrawer />
               </Suspense>
