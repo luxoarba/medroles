@@ -12,7 +12,6 @@ import MobileFilterDrawer from "../components/mobile-filter-drawer";
 import { supabase, formatSalary, type DBJobListing } from "../lib/supabase";
 import { DEANERY_REGIONS } from "../lib/jobs";
 import FilterSidebar from "../components/filter-sidebar";
-import OverflowDebug from "../components/overflow-debug";
 
 export const metadata: Metadata = {
   title: "NHS Doctor Jobs",
@@ -317,11 +316,10 @@ export default async function JobsPage({
 
   return (
     <div className="min-h-screen bg-gray-50 overflow-x-hidden">
-      <OverflowDebug />
       <AutoScrape />
       <Navbar />
 
-      <div className="mx-auto max-w-7xl px-4 py-5 sm:px-6 sm:py-8">
+      <div className="mx-auto max-w-7xl px-5 py-5 sm:px-6 sm:py-8">
         {/* Page header */}
         <div className="mb-8">
           {/* Row 1: title + mobile controls / desktop all-controls */}
@@ -340,10 +338,13 @@ export default async function JobsPage({
               </p>
             </div>
 
-            {/* Mobile: Filters button only */}
+            {/* Mobile: Filters + Sort (icon only) */}
             <div className="flex flex-shrink-0 items-center gap-2 sm:hidden">
               <Suspense fallback={null}>
                 <MobileFilterDrawer />
+              </Suspense>
+              <Suspense fallback={null}>
+                <SortSelect className="mobile" />
               </Suspense>
             </div>
 
@@ -362,18 +363,11 @@ export default async function JobsPage({
             </div>
           </div>
 
-          {/* Row 2: search + sort — mobile only */}
-          <div className="mt-3 flex items-center gap-2 sm:hidden">
-            <div className="min-w-0 flex-1">
-              <Suspense fallback={<div className="flex w-full items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm text-gray-300 ring-1 ring-gray-200" />}>
-                <SearchInput />
-              </Suspense>
-            </div>
-            <div className="flex-shrink-0">
-              <Suspense fallback={<div className="rounded-xl bg-white px-3 py-2.5 text-sm text-gray-300 ring-1 ring-gray-200">Sort…</div>}>
-                <SortSelect className="mobile" />
-              </Suspense>
-            </div>
+          {/* Row 2: full-width search — mobile only */}
+          <div className="mt-3 sm:hidden">
+            <Suspense fallback={<div className="flex w-full items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm text-gray-300 ring-1 ring-gray-200" />}>
+              <SearchInput />
+            </Suspense>
           </div>
         </div>
 
