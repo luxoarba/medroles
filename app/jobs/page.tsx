@@ -338,13 +338,10 @@ export default async function JobsPage({
               </p>
             </div>
 
-            {/* Mobile: Filters + Sort only */}
+            {/* Mobile: Filters button only */}
             <div className="flex flex-shrink-0 items-center gap-2 sm:hidden">
               <Suspense fallback={null}>
                 <MobileFilterDrawer />
-              </Suspense>
-              <Suspense fallback={<div className="rounded-xl bg-white px-4 py-2.5 text-sm text-gray-300 ring-1 ring-gray-200">Sort…</div>}>
-                <SortSelect />
               </Suspense>
             </div>
 
@@ -363,10 +360,13 @@ export default async function JobsPage({
             </div>
           </div>
 
-          {/* Row 2: full-width search — mobile only */}
-          <div className="mt-3 sm:hidden">
-            <Suspense fallback={<div className="flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm text-gray-300 ring-1 ring-gray-200 w-full" />}>
+          {/* Row 2: search + sort — mobile only */}
+          <div className="mt-3 flex items-center gap-2 sm:hidden">
+            <Suspense fallback={<div className="flex flex-1 items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm text-gray-300 ring-1 ring-gray-200" />}>
               <SearchInput />
+            </Suspense>
+            <Suspense fallback={<div className="rounded-xl bg-white px-3 py-2.5 text-sm text-gray-300 ring-1 ring-gray-200">Sort…</div>}>
+              <SortSelect />
             </Suspense>
           </div>
         </div>
