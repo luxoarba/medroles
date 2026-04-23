@@ -158,6 +158,7 @@ export default function FilterSidebar({ className }: { className?: string }) {
       <div className="flex-1 overflow-y-auto p-5 space-y-6">
         <FilterSection
           title="Specialty"
+          initiallyExpanded={false}
           items={SPECIALTIES}
           checkedValues={filters.specialty}
           onToggle={(v) => toggle("specialty", v)}
