@@ -5,15 +5,15 @@ import AutoScrape from "./components/auto-scrape";
 import { supabase } from "./lib/supabase";
 
 async function fetchCounts() {
-  const [{ count: jobCount }, { count: trustCount }] = await Promise.all([
-    supabase.from("job_listings").select("*", { count: "exact", head: true }),
-    supabase.from("trusts").select("*", { count: "exact", head: true }),
-  ]);
-  return { jobCount: jobCount ?? 0, trustCount: trustCount ?? 0 };
+  const { count: jobCount } = await supabase
+    .from("job_listings")
+    .select("*", { count: "exact", head: true })
+    .gte("closes_at", new Date().toISOString().slice(0, 10));
+  return { jobCount: jobCount ?? 0 };
 }
 
 export default async function Home() {
-  const { jobCount, trustCount } = await fetchCounts();
+  const { jobCount } = await fetchCounts();
   return (
     <div className="min-h-screen bg-white">
       <AutoScrape />
@@ -91,7 +91,7 @@ export default async function Home() {
           <div className="hidden h-12 w-px bg-gray-200 lg:block" />
           <div className="text-center">
             <p className="text-4xl font-bold tabular-nums text-gray-900">
-              <span className="text-emerald-600">{trustCount.toLocaleString("en-GB")}</span>
+              <span className="text-emerald-600">200+</span>
             </p>
             <p className="mt-1 text-sm text-gray-500">NHS trusts listed</p>
           </div>
