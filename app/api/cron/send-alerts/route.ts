@@ -48,6 +48,35 @@ function formatSalary(min: number | null, max: number | null): string {
   return `Up to ${fmt(max!)}`;
 }
 
+function buildPlainText(jobs: Job[], alert: Alert): string {
+  const unsubUrl = `${BASE}/api/alerts/unsubscribe?token=${alert.unsubscribe_token}`;
+  const filterLine = [alert.specialty?.join(", "), alert.grade?.join(", "), alert.region?.join(", ")]
+    .filter(Boolean)
+    .join(" · ");
+
+  const lines = [
+    "MedRoles — New NHS jobs matching your alert",
+    filterLine ? `Alert: ${filterLine}` : "",
+    "",
+    `${jobs.length} new job${jobs.length !== 1 ? "s" : ""} posted in the last 24 hours:`,
+    "",
+  ].filter((l) => l !== undefined);
+
+  for (const j of jobs) {
+    const trust = Array.isArray(j.trusts) ? j.trusts[0] : j.trusts;
+    const closes = j.closes_at
+      ? new Date(j.closes_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
+      : null;
+    lines.push(`${j.title}`);
+    lines.push(`${trust?.name ?? "NHS Trust"}${closes ? ` · Closes ${closes}` : ""}`);
+    lines.push(`${BASE}/jobs/${j.id}`);
+    lines.push("");
+  }
+
+  lines.push(`Unsubscribe: ${unsubUrl}`);
+  return lines.join("\n");
+}
+
 function buildEmail(jobs: Job[], alert: Alert): string {
   const unsubUrl = `${BASE}/api/alerts/unsubscribe?token=${alert.unsubscribe_token}`;
 
@@ -154,6 +183,7 @@ export async function POST(req: NextRequest) {
       to: alert.email,
       subject,
       html: buildEmail(matches, alert),
+      text: buildPlainText(matches, alert),
       headers: {
         "List-Unsubscribe": `<${BASE}/api/alerts/unsubscribe?token=${alert.unsubscribe_token}>`,
         "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
