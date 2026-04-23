@@ -25,6 +25,7 @@ export default function SearchInput() {
       } else {
         params.delete("search");
       }
+      params.delete("page");
       router.push(`/jobs?${params.toString()}`);
     }, 300);
   }
@@ -58,6 +59,7 @@ export default function SearchInput() {
             setValue("");
             const params = new URLSearchParams(searchParams.toString());
             params.delete("search");
+            params.delete("page");
             router.push(`/jobs?${params.toString()}`);
           }}
           className="text-gray-300 hover:text-gray-500 transition-colors"

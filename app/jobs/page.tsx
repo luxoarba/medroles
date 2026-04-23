@@ -4,7 +4,7 @@ import AlertSignup from "../components/alert-signup";
 import { Suspense } from "react";
 import Navbar from "../components/navbar";
 import BookmarkButton from "../components/bookmark-button";
-import RefreshButton from "../components/refresh-button";
+
 import AutoScrape from "../components/auto-scrape";
 import SortSelect from "../components/sort-select";
 import SearchInput from "../components/search-input";
@@ -22,6 +22,8 @@ export const metadata: Metadata = {
     url: "https://www.medroles.co.uk/jobs",
   },
 };
+
+const PAGE_SIZE = 50;
 
 const GRADE_COLOURS: Record<string, string> = {
   FY1: "bg-sky-50 text-sky-700 ring-sky-200",
@@ -88,7 +90,7 @@ function JobCard({ job }: { job: DBJobListing }) {
     : null;
 
   return (
-    <div className="group relative rounded-xl bg-white p-4 ring-1 ring-gray-200 hover:ring-emerald-300 hover:shadow-md transition-all duration-150 sm:rounded-2xl sm:p-6">
+    <div className="group relative min-w-0 rounded-xl bg-white p-4 ring-1 ring-gray-200 hover:ring-emerald-300 hover:shadow-md transition-all duration-150 sm:rounded-2xl sm:p-6">
       <Link href={`/jobs/${job.id}`} className="absolute inset-0 rounded-2xl" aria-label={job.title} />
       {/* Header */}
       <div className="mb-2 flex items-start justify-between gap-3 sm:mb-3">
@@ -198,6 +200,25 @@ function toArray(val: string | string[] | undefined): string[] {
   return Array.isArray(val) ? val : [val];
 }
 
+function relativeTime(isoString: string): string {
+  const mins = Math.floor((Date.now() - new Date(isoString).getTime()) / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.floor(hours / 24)}d ago`;
+}
+
+async function fetchLastUpdated(): Promise<string | null> {
+  const { data } = await supabase
+    .from("job_listings")
+    .select("created_at")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .single();
+  return data?.created_at ?? null;
+}
+
 async function fetchJobs(
   sort: string,
   filters: {
@@ -206,7 +227,8 @@ async function fetchJobs(
     deanery: string[];
     search: string;
   },
-): Promise<DBJobListing[]> {
+  page: number,
+): Promise<{ jobs: DBJobListing[]; total: number }> {
   let query = supabase
     .from("job_listings")
     .select(`
@@ -292,7 +314,133 @@ async function fetchJobs(
     }
   }
 
-  return Array.from(seen.values());
+  const all = Array.from(seen.values());
+  const total = all.length;
+  const start = (page - 1) * PAGE_SIZE;
+  return { jobs: all.slice(start, start + PAGE_SIZE), total };
+}
+
+function getPageNumbers(current: number, total: number): (number | "...")[] {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+
+  const range: number[] = [];
+  for (let i = 1; i <= total; i++) {
+    if (i === 1 || i === total || (i >= current - 1 && i <= current + 1)) {
+      range.push(i);
+    }
+  }
+
+  const result: (number | "...")[] = [];
+  let prev: number | null = null;
+  for (const p of range) {
+    if (prev !== null) {
+      if (p - prev === 2) result.push(prev + 1);
+      else if (p - prev > 2) result.push("...");
+    }
+    result.push(p);
+    prev = p;
+  }
+  return result;
+}
+
+function PaginationControls({
+  currentPage,
+  totalPages,
+  total,
+  rangeStart,
+  rangeEnd,
+  prevHref,
+  nextHref,
+  mkPageHref,
+}: {
+  currentPage: number;
+  totalPages: number;
+  total: number;
+  rangeStart: number;
+  rangeEnd: number;
+  prevHref: string | null;
+  nextHref: string | null;
+  mkPageHref: (page: number) => string;
+}) {
+  if (totalPages <= 1) return null;
+  const pages = getPageNumbers(currentPage, totalPages);
+
+  return (
+    <div className="mt-8 flex flex-col items-center gap-4">
+      <p className="text-sm text-gray-500">
+        Showing{" "}
+        <span className="font-semibold text-gray-800">{rangeStart}–{rangeEnd}</span>{" "}
+        of{" "}
+        <span className="font-semibold text-gray-800">{total}</span> roles
+      </p>
+
+      <div className="flex flex-wrap items-center justify-center gap-1">
+        {prevHref ? (
+          <Link
+            href={prevHref}
+            className="flex h-10 items-center gap-1 rounded-full bg-white px-3 text-sm font-medium text-gray-600 ring-1 ring-gray-200 hover:ring-emerald-400 hover:text-emerald-700 transition-colors"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+            </svg>
+            <span className="hidden sm:inline">Prev</span>
+          </Link>
+        ) : (
+          <span className="flex h-10 items-center gap-1 rounded-full px-3 text-sm font-medium text-gray-300 cursor-default select-none">
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+            </svg>
+            <span className="hidden sm:inline">Prev</span>
+          </span>
+        )}
+
+        {pages.map((p, i) =>
+          p === "..." ? (
+            <span
+              key={`dots-${i}`}
+              className="flex h-10 w-8 items-center justify-center text-sm text-gray-400 select-none"
+            >
+              …
+            </span>
+          ) : p === currentPage ? (
+            <span
+              key={p}
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-600 text-sm font-semibold text-white select-none"
+            >
+              {p}
+            </span>
+          ) : (
+            <Link
+              key={p}
+              href={mkPageHref(p)}
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-sm font-medium text-gray-600 ring-1 ring-gray-200 hover:ring-emerald-400 hover:text-emerald-700 transition-colors"
+            >
+              {p}
+            </Link>
+          ),
+        )}
+
+        {nextHref ? (
+          <Link
+            href={nextHref}
+            className="flex h-10 items-center gap-1 rounded-full bg-white px-3 text-sm font-medium text-gray-600 ring-1 ring-gray-200 hover:ring-emerald-400 hover:text-emerald-700 transition-colors"
+          >
+            <span className="hidden sm:inline">Next</span>
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
+          </Link>
+        ) : (
+          <span className="flex h-10 items-center gap-1 rounded-full px-3 text-sm font-medium text-gray-300 cursor-default select-none">
+            <span className="hidden sm:inline">Next</span>
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
+          </span>
+        )}
+      </div>
+    </div>
+  );
 }
 
 export default async function JobsPage({
@@ -300,9 +448,10 @@ export default async function JobsPage({
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
-  const { sort = "closes_at", specialty, grade, deanery, search } = await searchParams;
+  const { sort = "closes_at", specialty, grade, deanery, search, page: pageParam } = await searchParams;
   const sortValue = Array.isArray(sort) ? sort[0] : sort;
   const searchValue = Array.isArray(search) ? (search[0] ?? "") : (search ?? "");
+  const page = Math.max(1, Number(Array.isArray(pageParam) ? (pageParam[0] ?? "1") : (pageParam ?? "1")) || 1);
   const filters = {
     specialty: toArray(specialty),
     grade: toArray(grade),
@@ -312,7 +461,26 @@ export default async function JobsPage({
   const activeFilterCount =
     filters.specialty.length + filters.grade.length + filters.deanery.length;
 
-  const jobs = await fetchJobs(sortValue, filters);
+  const [{ jobs, total }, lastUpdatedAt] = await Promise.all([
+    fetchJobs(sortValue, filters, page),
+    fetchLastUpdated(),
+  ]);
+  const totalPages = Math.ceil(total / PAGE_SIZE);
+
+  function mkPageHref(p: number): string {
+    const sp = new URLSearchParams();
+    if (sortValue !== "closes_at") sp.set("sort", sortValue);
+    filters.specialty.forEach((s) => sp.append("specialty", s));
+    filters.grade.forEach((g) => sp.append("grade", g));
+    filters.deanery.forEach((d) => sp.append("deanery", d));
+    if (searchValue) sp.set("search", searchValue);
+    if (p > 1) sp.set("page", String(p));
+    const s = sp.toString();
+    return s ? `/jobs?${s}` : "/jobs";
+  }
+
+  const prevHref = page > 1 ? mkPageHref(page - 1) : null;
+  const nextHref = page < totalPages ? mkPageHref(page + 1) : null;
 
   return (
     <div className="min-h-screen bg-gray-50 overflow-x-hidden">
@@ -327,9 +495,14 @@ export default async function JobsPage({
             <div>
               <h1 className="text-2xl font-bold text-gray-900">NHS Jobs</h1>
               <p className="mt-1 text-sm text-gray-500">
-                Showing{" "}
-                <span className="font-semibold text-emerald-600">{jobs.length}</span>{" "}
-                live {jobs.length === 1 ? "role" : "roles"}
+                <span className="font-semibold text-emerald-600">{total}</span>{" "}
+                live {total === 1 ? "role" : "roles"}
+                {totalPages > 1 && (
+                  <span className="text-gray-400">
+                    {" · "}
+                    {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)} shown
+                  </span>
+                )}
                 {(activeFilterCount > 0 || searchValue) && (
                   <span className="ml-1.5 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
                     {activeFilterCount + (searchValue ? 1 : 0)} filter{activeFilterCount + (searchValue ? 1 : 0) !== 1 ? "s" : ""} active
@@ -344,7 +517,7 @@ export default async function JobsPage({
                 <MobileFilterDrawer />
               </Suspense>
               <Suspense fallback={null}>
-                <SortSelect className="mobile" />
+                <SortSelect />
               </Suspense>
             </div>
 
@@ -353,7 +526,12 @@ export default async function JobsPage({
               <Suspense fallback={null}>
                 <MobileFilterDrawer />
               </Suspense>
-              <RefreshButton />
+              {lastUpdatedAt && (
+                <span className="flex items-center gap-1.5 text-xs text-gray-400 whitespace-nowrap">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                  Updated {relativeTime(lastUpdatedAt)}
+                </span>
+              )}
               <Suspense fallback={<div className="flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm text-gray-300 ring-1 ring-gray-200 w-52" />}>
                 <SearchInput />
               </Suspense>
@@ -369,6 +547,14 @@ export default async function JobsPage({
               <SearchInput />
             </Suspense>
           </div>
+
+          {/* Row 3: freshness indicator — mobile only */}
+          {lastUpdatedAt && (
+            <div className="mt-2 flex items-center gap-1.5 sm:hidden">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+              <span className="text-xs text-gray-400">Updated {relativeTime(lastUpdatedAt)}</span>
+            </div>
+          )}
         </div>
 
         <div className="lg:flex lg:gap-6">
@@ -401,11 +587,23 @@ export default async function JobsPage({
                 </p>
               </div>
             ) : (
-              <div className="grid gap-4 sm:grid-cols-2">
-                {jobs.map((job) => (
-                  <JobCard key={job.id} job={job} />
-                ))}
-              </div>
+              <>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  {jobs.map((job) => (
+                    <JobCard key={job.id} job={job} />
+                  ))}
+                </div>
+                <PaginationControls
+                  currentPage={page}
+                  totalPages={totalPages}
+                  total={total}
+                  rangeStart={(page - 1) * PAGE_SIZE + 1}
+                  rangeEnd={Math.min(page * PAGE_SIZE, total)}
+                  prevHref={prevHref}
+                  nextHref={nextHref}
+                  mkPageHref={mkPageHref}
+                />
+              </>
             )}
           </main>
         </div>

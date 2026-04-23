@@ -7,9 +7,10 @@ const supabase = createClient(
 
 const BASE_URL = "https://www.healthjobsuk.com";
 const LIST_PATH = "/job_list/Medical_and_Dental";
-const SAFETY_PAGE_CAP = 50;  // healthjobsuk.com Medical & Dental rarely exceeds 50 pages
+const SAFETY_PAGE_CAP = 200; // confirmed 137 pages as of Apr 2026; 200 gives headroom
 const LIST_DELAY_MS = 150;
 const DETAIL_CONCURRENCY = 8; // fetch detail pages in batches of 8
+const MAX_DETAIL_FETCHES = 300; // per run — prioritise unenriched jobs, same pattern as scrape-jobs
 
 interface ParsedJob {
   vacancyId: string;
@@ -318,8 +319,7 @@ function isDoctorRole(title: string): boolean {
     /\bmedical officer\b/.test(t) ||
     /\bclinical fellow\b/.test(t) ||
     /\bmedical fellow\b/.test(t) ||
-    /\bphysician\b/.test(t) ||
-    /\bdentist\b|\bdental surgeon\b|\bdental officer\b|\bdental practitioner\b/.test(t)
+    /\bphysician\b/.test(t)
   );
 }
 
@@ -463,12 +463,26 @@ Deno.serve(async () => {
     // Filter to doctor/dentist roles only
     const doctorJobs = unique.filter((j) => isDoctorRole(j.title));
 
-    // Fetch detail pages in concurrent batches to get closing dates
-    const details = await batchMap(
-      doctorJobs,
-      DETAIL_CONCURRENCY,
-      (job) => fetchDetail(job.externalUrl),
-    );
+    // Skip detail fetches for jobs already enriched in DB — same optimisation as scrape-jobs.
+    // Unenriched jobs (no requirements) come first; already-enriched ones fill the remainder.
+    const { data: alreadyEnriched } = await supabase
+      .from("job_listings")
+      .select("external_url")
+      .eq("source", "Trac Jobs")
+      .not("requirements", "is", null);
+    const enrichedUrls = new Set((alreadyEnriched ?? []).map((r: { external_url: string }) => r.external_url));
+
+    const toEnrich = [
+      ...doctorJobs.filter((j) => !enrichedUrls.has(j.externalUrl)),
+      ...doctorJobs.filter((j) => enrichedUrls.has(j.externalUrl)),
+    ].slice(0, MAX_DETAIL_FETCHES);
+
+    // Fetch detail pages only for the capped set; null-fill the rest
+    const detailMap = new Map<string, DetailData | null>();
+    const fetched = await batchMap(toEnrich, DETAIL_CONCURRENCY, (job) => fetchDetail(job.externalUrl));
+    for (let i = 0; i < toEnrich.length; i++) detailMap.set(toEnrich[i].externalUrl, fetched[i]);
+
+    const details = doctorJobs.map((j) => detailMap.get(j.externalUrl) ?? null);
 
     // Resolve trusts (prefer detail page employer name as it's canonical)
     const trustNames = doctorJobs.map((job, i) =>

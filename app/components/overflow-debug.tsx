@@ -7,21 +7,28 @@ export default function OverflowDebug() {
   useEffect(() => {
     function check() {
       const vw = window.innerWidth;
-      const sw = document.documentElement.scrollWidth;
-      if (sw <= vw) {
-        setInfo(`OK: ${vw}px`);
-        return;
-      }
-      // Find widest element
+      // Always scan bounding rects — scrollWidth is unreliable when
+      // overflow-x:hidden clamps it to viewport width regardless of content.
       let widest: Element | null = null;
-      let maxW = 0;
+      let maxRight = 0;
       document.querySelectorAll("*").forEach((el) => {
         const r = el.getBoundingClientRect();
-        const right = r.right;
-        if (right > maxW) { maxW = right; widest = el; }
+        if (r.right > maxRight) { maxRight = r.right; widest = el; }
       });
-      const tag = widest ? `${(widest as Element).tagName}.${(widest as Element).className.toString().slice(0, 40)}` : "?";
-      setInfo(`OVERFLOW ${sw - vw}px extra | vw=${vw} | ${tag}`);
+      const extra = maxRight - vw;
+      if (extra > 0 && widest) {
+        const r2 = (widest as Element).getBoundingClientRect();
+        const par = (widest as Element).parentElement;
+        const parR = par?.getBoundingClientRect();
+        setInfo(
+          `OVER +${extra.toFixed(0)}px | el: left=${r2.left.toFixed(0)} w=${r2.width.toFixed(0)} right=${r2.right.toFixed(0)} | parent w=${parR?.width.toFixed(0)} | vw=${vw} | ${(widest as Element).tagName}.${(widest as Element).className.toString().slice(0, 40)}`
+        );
+      } else if (extra > -10 && widest) {
+        const r2 = (widest as Element).getBoundingClientRect();
+        setInfo(`EDGE | el: left=${r2.left.toFixed(0)} w=${r2.width.toFixed(0)} right=${r2.right.toFixed(0)} | vw=${vw}`);
+      } else {
+        setInfo(`OK max-right=${maxRight.toFixed(1)} vw=${vw}`);
+      }
     }
     check();
     window.addEventListener("resize", check);

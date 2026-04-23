@@ -347,8 +347,7 @@ function isDoctorRole(title: string): boolean {
     /\bmedical officer\b/.test(t) ||
     /\bclinical fellow\b/.test(t) ||
     /\bmedical fellow\b/.test(t) ||
-    /\bphysician\b/.test(t) ||
-    /\bdentist\b|\bdental surgeon\b|\bdental officer\b|\bdental practitioner\b/.test(t)
+    /\bphysician\b/.test(t)
   );
 }
 
