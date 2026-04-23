@@ -154,6 +154,10 @@ export async function POST(req: NextRequest) {
       to: alert.email,
       subject,
       html: buildEmail(matches, alert),
+      headers: {
+        "List-Unsubscribe": `<${BASE}/api/alerts/unsubscribe?token=${alert.unsubscribe_token}>`,
+        "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+      },
     });
 
     if (error) {
