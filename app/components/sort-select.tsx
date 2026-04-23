@@ -3,14 +3,14 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useTransition } from "react";
 
 const OPTIONS = [
-  { label: "Closing soon", value: "closes_at" },
   { label: "Newest", value: "posted_at" },
+  { label: "Closing soon", value: "closes_at" },
 ];
 
 export default function SortSelect({ className }: { className?: string }) {
   const router = useRouter();
   const params = useSearchParams();
-  const current = params.get("sort") ?? "closes_at";
+  const current = params.get("sort") ?? "posted_at";
   const [isPending, startTransition] = useTransition();
 
   return (

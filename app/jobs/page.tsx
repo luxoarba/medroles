@@ -448,7 +448,7 @@ export default async function JobsPage({
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
-  const { sort = "closes_at", specialty, grade, deanery, search, page: pageParam } = await searchParams;
+  const { sort = "posted_at", specialty, grade, deanery, search, page: pageParam } = await searchParams;
   const sortValue = Array.isArray(sort) ? sort[0] : sort;
   const searchValue = Array.isArray(search) ? (search[0] ?? "") : (search ?? "");
   const page = Math.max(1, Number(Array.isArray(pageParam) ? (pageParam[0] ?? "1") : (pageParam ?? "1")) || 1);
@@ -469,7 +469,7 @@ export default async function JobsPage({
 
   function mkPageHref(p: number): string {
     const sp = new URLSearchParams();
-    if (sortValue !== "closes_at") sp.set("sort", sortValue);
+    if (sortValue !== "posted_at") sp.set("sort", sortValue);
     filters.specialty.forEach((s) => sp.append("specialty", s));
     filters.grade.forEach((g) => sp.append("grade", g));
     filters.deanery.forEach((d) => sp.append("deanery", d));
