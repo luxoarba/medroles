@@ -5,11 +5,8 @@ import AutoScrape from "./components/auto-scrape";
 import { supabase } from "./lib/supabase";
 
 async function fetchCounts() {
-  const { count: jobCount } = await supabase
-    .from("job_listings")
-    .select("*", { count: "exact", head: true })
-    .gte("closes_at", new Date().toISOString().slice(0, 10));
-  return { jobCount: jobCount ?? 0 };
+  const { data } = await supabase.rpc("live_job_count");
+  return { jobCount: (data as number) ?? 0 };
 }
 
 export default async function Home() {
