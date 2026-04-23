@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Navbar from "../components/navbar";
-import InterviewForm from "./interview-form";
+import InterviewFormToggle from "./interview-form-toggle";
 import { supabase } from "../lib/supabase";
 
 export const metadata: Metadata = {
@@ -69,32 +69,24 @@ export default async function InterviewIntelPage({
           </p>
         </div>
 
-        {/* Submission form */}
-        <div className="mb-10 rounded-2xl bg-white p-7 ring-1 ring-gray-200">
-          <h2 className="mb-5 text-base font-semibold text-gray-900">Share your interview experience</h2>
-          <InterviewForm trusts={trusts ?? []} defaultTrustId={trust_id} />
-        </div>
-
         {/* Insights list */}
-        <div>
-          <h2 className="mb-4 text-base font-semibold text-gray-900">
-            Recent experiences
-            {(insights?.length ?? 0) > 0 && (
-              <span className="ml-2 text-sm font-normal text-gray-400">
-                ({insights!.length})
-              </span>
-            )}
-          </h2>
+        <div className="mb-6">
+          {(insights?.length ?? 0) > 0 && (
+            <h2 className="mb-4 text-base font-semibold text-gray-900">
+              Recent experiences
+              <span className="ml-2 text-sm font-normal text-gray-400">({insights!.length})</span>
+            </h2>
+          )}
 
           {(insights?.length ?? 0) === 0 ? (
-            <div className="rounded-2xl bg-white p-10 text-center ring-1 ring-gray-200">
-              <p className="text-sm font-medium text-gray-400">No interview reports yet</p>
+            <div className="mb-6 rounded-2xl bg-white p-10 text-center ring-1 ring-gray-200">
+              <p className="text-sm font-medium text-gray-500">No interview reports yet</p>
               <p className="mt-1 text-xs text-gray-400">Be the first to help your colleagues prepare.</p>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-4 mb-6">
               {insights!.map((ins) => {
-                const trustName = Array.isArray(ins.trusts)
+                const insTrustName = Array.isArray(ins.trusts)
                   ? ins.trusts[0]?.name
                   : (ins.trusts as { name: string } | null)?.name;
                 const date = new Date(ins.created_at).toLocaleDateString("en-GB", {
@@ -106,7 +98,7 @@ export default async function InterviewIntelPage({
                   <div key={ins.id} className="rounded-xl bg-white p-5 ring-1 ring-gray-200">
                     <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
                       <div>
-                        <p className="font-medium text-gray-900">{trustName ?? "NHS Trust"}</p>
+                        <p className="font-medium text-gray-900">{insTrustName ?? "NHS Trust"}</p>
                         <div className="mt-1 flex flex-wrap gap-1.5">
                           {ins.grade && (
                             <span className="rounded-md bg-gray-50 px-2 py-0.5 text-xs text-gray-600 ring-1 ring-gray-200">
@@ -154,6 +146,9 @@ export default async function InterviewIntelPage({
             </div>
           )}
         </div>
+
+        {/* Submit CTA */}
+        <InterviewFormToggle trusts={trusts ?? []} defaultTrustId={trust_id} />
       </div>
     </div>
   );
