@@ -115,6 +115,11 @@ export default function AlertSignup() {
           </div>
           <p className="font-semibold text-gray-900">Alert set</p>
           <p className="mt-1 text-xs text-gray-500">We'll email you when new matching jobs are posted.</p>
+          <p className="mt-3 text-xs text-gray-400">
+            If you use an NHS email, check your junk folder and mark the email as{" "}
+            <span className="font-medium text-gray-500">not junk</span>, or add{" "}
+            <span className="font-medium text-gray-500">alerts@medroles.co.uk</span> to your safe senders.
+          </p>
         </div>
       </div>
     );
@@ -169,6 +174,11 @@ export default function AlertSignup() {
         >
           {status === "loading" ? "Saving…" : "Notify me"}
         </button>
+
+        <p className="text-center text-[11px] text-gray-400">
+          Using an NHS email? Add{" "}
+          <span className="font-medium text-gray-500">alerts@medroles.co.uk</span> to your safe senders to ensure delivery.
+        </p>
       </form>
     </div>
   );
