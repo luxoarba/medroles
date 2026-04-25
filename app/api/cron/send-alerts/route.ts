@@ -140,7 +140,7 @@ function buildEmail(jobs: Job[], alert: Alert): string {
 </body></html>`;
 }
 
-export async function POST(req: NextRequest) {
+export async function GET(req: NextRequest) {
   // Vercel cron sends: Authorization: Bearer <CRON_SECRET>
   const auth = req.headers.get("authorization");
   if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
