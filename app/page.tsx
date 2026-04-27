@@ -126,6 +126,54 @@ export default async function Home() {
         </div>
       </section>
 
+      {/* Grade spotlight */}
+      <section className="px-6 py-24">
+        <div className="mx-auto max-w-7xl">
+          <div className="mb-12 text-center">
+            <h2 className="mb-3 text-3xl font-bold tracking-tight text-gray-900">
+              Browse by career stage
+            </h2>
+            <p className="text-base text-gray-500">
+              Live roles right now, filtered for your grade.
+            </p>
+          </div>
+
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            {GRADE_SPOTLIGHT.map(({ grade, label, short, description }) => {
+              const count = gradeCounts[grade] ?? 0;
+              return (
+                <Link
+                  key={grade}
+                  href={`/jobs?grade=${encodeURIComponent(grade)}`}
+                  className="group flex flex-col justify-between rounded-2xl bg-white p-6 ring-1 ring-gray-200 hover:ring-emerald-300 hover:shadow-md transition-all duration-150"
+                >
+                  <div>
+                    <div className="mb-4 flex items-center gap-2">
+                      <span className="rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700 ring-1 ring-emerald-100">
+                        {short ?? label.split(" ")[0]}
+                      </span>
+                    </div>
+                    <p className="text-[15px] font-semibold text-gray-900 group-hover:text-emerald-700 transition-colors">
+                      {label}
+                    </p>
+                    <p className="mt-1 text-sm text-gray-400">{description}</p>
+                  </div>
+                  <div className="mt-5 flex items-end justify-between">
+                    <div>
+                      <p className="text-3xl font-bold tabular-nums text-gray-900">{count}</p>
+                      <p className="text-xs text-gray-400">live {count === 1 ? "role" : "roles"}</p>
+                    </div>
+                    <svg className="h-5 w-5 text-gray-300 group-hover:text-emerald-500 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                    </svg>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
       {/* Feature cards */}
       <section className="bg-gray-50 px-6 py-24">
         <div className="mx-auto max-w-7xl">
@@ -260,54 +308,6 @@ export default async function Home() {
                 </span>
               </div>
             </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Grade spotlight */}
-      <section className="px-6 py-24">
-        <div className="mx-auto max-w-7xl">
-          <div className="mb-12 text-center">
-            <h2 className="mb-3 text-3xl font-bold tracking-tight text-gray-900">
-              Browse by career stage
-            </h2>
-            <p className="text-base text-gray-500">
-              Live roles right now, filtered for your grade.
-            </p>
-          </div>
-
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-            {GRADE_SPOTLIGHT.map(({ grade, label, short, description }) => {
-              const count = gradeCounts[grade] ?? 0;
-              return (
-                <Link
-                  key={grade}
-                  href={`/jobs?grade=${encodeURIComponent(grade)}`}
-                  className="group flex flex-col justify-between rounded-2xl bg-white p-6 ring-1 ring-gray-200 hover:ring-emerald-300 hover:shadow-md transition-all duration-150"
-                >
-                  <div>
-                    <div className="mb-4 flex items-center gap-2">
-                      <span className="rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700 ring-1 ring-emerald-100">
-                        {short ?? label.split(" ")[0]}
-                      </span>
-                    </div>
-                    <p className="text-[15px] font-semibold text-gray-900 group-hover:text-emerald-700 transition-colors">
-                      {label}
-                    </p>
-                    <p className="mt-1 text-sm text-gray-400">{description}</p>
-                  </div>
-                  <div className="mt-5 flex items-end justify-between">
-                    <div>
-                      <p className="text-3xl font-bold tabular-nums text-gray-900">{count}</p>
-                      <p className="text-xs text-gray-400">live {count === 1 ? "role" : "roles"}</p>
-                    </div>
-                    <svg className="h-5 w-5 text-gray-300 group-hover:text-emerald-500 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
-                    </svg>
-                  </div>
-                </Link>
-              );
-            })}
           </div>
         </div>
       </section>
