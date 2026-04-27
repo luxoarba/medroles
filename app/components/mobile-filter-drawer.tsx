@@ -13,11 +13,6 @@ export default function MobileFilterDrawer() {
     searchParams.getAll("grade").length +
     searchParams.getAll("deanery").length;
 
-  // Close drawer on navigation (filter applied)
-  useEffect(() => {
-    setOpen(false);
-  }, [searchParams]);
-
   // Prevent body scroll when drawer is open
   useEffect(() => {
     document.body.style.overflow = open ? "hidden" : "";
@@ -54,9 +49,19 @@ export default function MobileFilterDrawer() {
 
           {/* Bottom sheet */}
           <div className="absolute bottom-0 left-0 right-0 flex max-h-[85vh] flex-col rounded-t-2xl bg-white shadow-2xl">
-            {/* Handle bar */}
-            <div className="flex flex-shrink-0 items-center justify-center pt-3 pb-1">
+            {/* Handle bar + header */}
+            <div className="flex flex-shrink-0 flex-col items-center pt-3 pb-2">
               <div className="h-1 w-10 rounded-full bg-gray-200" />
+              <div className="mt-3 flex w-full items-center justify-between px-5">
+                <span className="text-sm font-semibold text-gray-900">Filters</span>
+                <button
+                  type="button"
+                  onClick={() => setOpen(false)}
+                  className="rounded-lg bg-emerald-600 px-4 py-1.5 text-sm font-semibold text-white hover:bg-emerald-700 transition-colors"
+                >
+                  Done
+                </button>
+              </div>
             </div>
 
             {/* FilterSidebar fills the sheet — override its sticky card styling */}
