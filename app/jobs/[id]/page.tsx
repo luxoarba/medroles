@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import Navbar from "../../components/navbar";
 import BookmarkButton from "../../components/bookmark-button";
+import ShareButton from "../../components/share-button";
+import ReportClosedButton from "../../components/report-closed-button";
 import { supabase, formatSalary, type DBJobListing } from "../../lib/supabase";
 
 export async function generateMetadata({
@@ -266,7 +268,10 @@ export default async function JobDetailPage({
                   </div>
                   <p className="mt-1 text-sm text-gray-400">{job.region}</p>
                 </div>
-                <BookmarkButton jobId={job.id} />
+                <div className="flex items-center gap-2">
+                  <ShareButton title={job.title} url={`https://www.medroles.co.uk/jobs/${id}`} />
+                  <BookmarkButton jobId={job.id} />
+                </div>
               </div>
 
               {/* Key details grid */}
@@ -414,6 +419,9 @@ export default async function JobDetailPage({
                 <p className="mt-3 text-center text-xs text-gray-400">
                   You will be redirected to {job.source}
                 </p>
+                <div className="mt-4 border-t border-gray-100 pt-4">
+                  <ReportClosedButton jobId={job.id} />
+                </div>
               </div>
 
               {/* Trust rating card */}
