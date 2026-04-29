@@ -171,20 +171,20 @@ function JobCard({ job }: { job: DBJobListing }) {
       </div>
 
       {/* Footer */}
-      {closing !== null && days !== null && (
+      {(closing !== null || days === null) && (
         <div className="mt-3 flex items-center justify-between border-t border-gray-100 pt-3 sm:mt-4 sm:pt-4">
           <span
             className={`text-xs font-medium ${
-              days <= 7
+              days !== null && days <= 7
                 ? "text-red-600"
-                : days <= 14
+                : days !== null && days <= 14
                   ? "text-amber-600"
                   : "text-gray-400"
             }`}
           >
-            {days <= 7 ? "⚠ " : ""}
-            {days === 0 ? "Closes today" : `Closes ${closing}`}
-            {days > 0 ? ` · ${days}d left` : days < 0 ? " · Closed" : ""}
+            {days !== null && days <= 7 ? "⚠ " : ""}
+            {days === null ? "Closing date TBC" : days === 0 ? "Closes today" : `Closes ${closing}`}
+            {days !== null && days > 0 ? ` · ${days}d left` : days !== null && days < 0 ? " · Closed" : ""}
           </span>
           {job.source && (
             <span className="hidden text-xs text-gray-400 sm:block">{job.source}</span>
@@ -257,7 +257,7 @@ async function fetchJobs(
       )
     `)
     // Only show jobs that close today or later
-    .gte("closes_at", new Date().toISOString().slice(0, 10));
+    .or(`closes_at.gte.${new Date().toISOString().slice(0, 10)},closes_at.is.null`);
 
   if (filters.specialty.length > 0) query = query.in("specialty", filters.specialty);
   if (filters.grade.length > 0) query = query.in("grade", filters.grade);
