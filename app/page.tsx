@@ -5,22 +5,46 @@ import AutoScrape from "./components/auto-scrape";
 import { supabase } from "./lib/supabase";
 
 const GRADE_SPOTLIGHT = [
-  { grade: "Junior Clinical Fellow", label: "Junior Clinical Fellow", short: "JCF", description: "Post-foundation non-training posts" },
-  { grade: "Senior Clinical Fellow", label: "Senior Clinical Fellow", short: "SCF", description: "Senior non-training & research posts" },
-  { grade: "Consultant", label: "Consultant", short: null, description: "Substantive & fixed-term consultant roles" },
-  { grade: "SAS", label: "SAS Doctor", short: "SAS", description: "Staff grade, associate specialist & specialty" },
+  {
+    key: "jcf",
+    grades: ["Junior Clinical Fellow", "FY2", "CT1", "CT2"],
+    label: "JCF / Core Training",
+    short: "JCF",
+    description: "Clinical fellows, FY2 & core trainees (CT1–2)",
+  },
+  {
+    key: "scf",
+    grades: ["Senior Clinical Fellow", "ST3", "ST4", "ST5", "ST6", "ST7"],
+    label: "SCF / Registrar",
+    short: "SCF",
+    description: "Senior fellows & specialty registrars (ST3–7)",
+  },
+  {
+    key: "consultant",
+    grades: ["Consultant"],
+    label: "Consultant",
+    short: null,
+    description: "Substantive & fixed-term consultant roles",
+  },
+  {
+    key: "sas",
+    grades: ["SAS"],
+    label: "SAS Doctor",
+    short: "SAS",
+    description: "Staff grade, associate specialist & specialty",
+  },
 ];
 
 async function fetchGradeCounts(): Promise<Record<string, number>> {
   const today = new Date().toISOString().slice(0, 10);
   const results = await Promise.all(
-    GRADE_SPOTLIGHT.map(({ grade }) =>
+    GRADE_SPOTLIGHT.map(({ key, grades }) =>
       supabase
         .from("job_listings")
         .select("*", { count: "exact", head: true })
-        .eq("grade", grade)
+        .in("grade", grades)
         .gte("closes_at", today)
-        .then(({ count }) => [grade, count ?? 0] as [string, number]),
+        .then(({ count }) => [key, count ?? 0] as [string, number]),
     ),
   );
   return Object.fromEntries(results);
@@ -139,12 +163,14 @@ export default async function Home() {
           </div>
 
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-            {GRADE_SPOTLIGHT.map(({ grade, label, short, description }) => {
-              const count = gradeCounts[grade] ?? 0;
+            {GRADE_SPOTLIGHT.map(({ key, grades, label, short, description }) => {
+              const count = gradeCounts[key] ?? 0;
+              const params = new URLSearchParams();
+              grades.forEach((g) => params.append("grade", g));
               return (
                 <Link
-                  key={grade}
-                  href={`/jobs?grade=${encodeURIComponent(grade)}`}
+                  key={key}
+                  href={`/jobs?${params.toString()}`}
                   className="group flex flex-col justify-between rounded-2xl bg-white p-6 ring-1 ring-gray-200 hover:ring-emerald-300 hover:shadow-md transition-all duration-150"
                 >
                   <div>
@@ -347,8 +373,8 @@ export default async function Home() {
           <div className="flex gap-5">
             <Link href="/privacy" className="hover:text-gray-600 transition-colors">Privacy</Link>
             <Link href="/terms" className="hover:text-gray-600 transition-colors">Terms</Link>
-            <a href="#" className="hover:text-gray-600 transition-colors">For trusts</a>
-            <a href="#" className="hover:text-gray-600 transition-colors">Contact</a>
+            <Link href="/for-trusts" className="hover:text-gray-600 transition-colors">For trusts</Link>
+            <Link href="/contact" className="hover:text-gray-600 transition-colors">Contact</Link>
           </div>
         </div>
       </footer>

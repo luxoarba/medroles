@@ -33,6 +33,8 @@ export type DBJobListing = {
 
 export function formatSalary(min: number | null, max: number | null): string | null {
   if (!min && !max) return null;
+  // Suppress clearly non-annual figures (e.g. hourly rates stored as salary)
+  if ((max ?? 0) < 1000 && (min ?? 0) < 1000) return null;
   const fmt = (n: number) =>
     "£" + n.toLocaleString("en-GB", { maximumFractionDigits: 0 });
   if (min && max) return `${fmt(min)} – ${fmt(max)}`;

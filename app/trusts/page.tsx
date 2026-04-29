@@ -1,37 +1,8 @@
-import Link from "next/link";
 import Navbar from "../components/navbar";
+import TrustSearch from "../components/trust-search";
 import { supabase } from "../lib/supabase";
 
-const TYPE_LABELS: Record<string, string> = {
-  acute: "Acute",
-  mental_health: "Mental Health",
-  community: "Community",
-  ambulance: "Ambulance",
-  primary_care: "Primary Care",
-  specialist: "Specialist",
-};
-
-function StarRating({ rating }: { rating: number }) {
-  return (
-    <span className="flex items-center gap-0.5">
-      {[1, 2, 3, 4, 5].map((s) => (
-        <svg
-          key={s}
-          viewBox="0 0 20 20"
-          fill={s <= Math.round(rating) ? "#059669" : "none"}
-          stroke={s <= Math.round(rating) ? "#059669" : "#d1d5db"}
-          className="h-3.5 w-3.5"
-        >
-          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-        </svg>
-      ))}
-      <span className="ml-1 text-xs text-gray-500">{rating.toFixed(1)}</span>
-    </span>
-  );
-}
-
 export default async function TrustsPage() {
-  // Fetch trusts + job count per trust in one query
   const { data: trusts } = await supabase
     .from("trusts")
     .select("id, name, type, avg_rating, review_count, job_listings(count)")
@@ -40,7 +11,7 @@ export default async function TrustsPage() {
   const rows = (trusts ?? []).map((t) => {
     const countRaw = t.job_listings as unknown as { count: number }[] | null;
     const jobCount = Array.isArray(countRaw) ? (countRaw[0]?.count ?? 0) : 0;
-    return { ...t, jobCount };
+    return { id: t.id, name: t.name, type: t.type, avg_rating: t.avg_rating, review_count: t.review_count, jobCount };
   });
 
   // Sort: trusts with open jobs first, then alphabetically
@@ -52,7 +23,6 @@ export default async function TrustsPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar />
-
       <div className="mx-auto max-w-5xl px-6 py-10">
         <div className="mb-8">
           <h1 className="text-2xl font-bold text-gray-900">NHS Trusts</h1>
@@ -60,47 +30,7 @@ export default async function TrustsPage() {
             {rows.length} trusts · browse open roles and ratings
           </p>
         </div>
-
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {rows.map((trust) => (
-            <Link
-              key={trust.id}
-              href={`/trusts/${trust.id}`}
-              className="group flex flex-col justify-between rounded-xl bg-white p-5 ring-1 ring-gray-200 hover:ring-emerald-300 hover:shadow-sm transition-all"
-            >
-              <div>
-                <p className="font-semibold text-gray-900 group-hover:text-emerald-700 transition-colors leading-snug">
-                  {trust.name}
-                </p>
-                <div className="mt-2 flex flex-wrap items-center gap-2">
-                  {trust.type && (
-                    <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-[11px] font-medium text-gray-500">
-                      {TYPE_LABELS[trust.type] ?? trust.type}
-                    </span>
-                  )}
-                  {trust.avg_rating !== null && (
-                    <StarRating rating={trust.avg_rating} />
-                  )}
-                </div>
-              </div>
-
-              <div className="mt-4 flex items-center justify-between border-t border-gray-100 pt-3">
-                <span className="text-xs text-gray-400">
-                  {trust.review_count
-                    ? `${trust.review_count} review${trust.review_count !== 1 ? "s" : ""}`
-                    : "No reviews yet"}
-                </span>
-                {trust.jobCount > 0 ? (
-                  <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
-                    {trust.jobCount} open role{trust.jobCount !== 1 ? "s" : ""}
-                  </span>
-                ) : (
-                  <span className="text-xs text-gray-300">No open roles</span>
-                )}
-              </div>
-            </Link>
-          ))}
-        </div>
+        <TrustSearch trusts={rows} />
       </div>
     </div>
   );
