@@ -463,8 +463,43 @@ Deno.serve(async () => {
     // Filter to doctor/dentist roles only
     const doctorJobs = unique.filter((j) => isDoctorRole(j.title));
 
-    // Skip detail fetches for jobs already enriched in DB — same optimisation as scrape-jobs.
-    // Unenriched jobs (no requirements) come first; already-enriched ones fill the remainder.
+    // Phase 1: resolve trusts from listing data and upsert basic rows immediately.
+    // ignoreDuplicates:true means existing enriched rows are not overwritten.
+    // New jobs land in the DB right now — before any detail fetching that might time out.
+    const basicTrustMap = await resolveTrusts(doctorJobs.map((j) => j.trustName));
+    const basicRows = doctorJobs.map((job) => {
+      const { min, max } = parseSalary(job.salaryText);
+      return {
+        title: job.title,
+        trust_id: basicTrustMap.get(job.trustName) ?? null,
+        region: job.location?.replace(/<[^>]+>/g, "").trim() || null,
+        grade: inferGrade(job.title),
+        specialty: inferSpecialty(job.title),
+        contract_type: null,
+        salary_min: min,
+        salary_max: max,
+        closes_at: null,
+        description: null,
+        requirements: null,
+        benefits: null,
+        posted_at: null,
+        external_url: job.externalUrl,
+        source: "Trac Jobs",
+        category: "Medical and Dental",
+        pay_band: null,
+        on_call: null,
+        training_post: null,
+        is_active: true,
+        cesr_support: false,
+      };
+    });
+    await supabase
+      .from("job_listings")
+      .upsert(basicRows, { onConflict: "external_url", ignoreDuplicates: true });
+    stats.upserted = basicRows.length;
+
+    // Phase 2: enrich with detail pages (best-effort — timeout here is acceptable).
+    // Skip detail fetches for jobs already enriched in DB.
     const { data: alreadyEnriched } = await supabase
       .from("job_listings")
       .select("external_url")
@@ -484,13 +519,11 @@ Deno.serve(async () => {
 
     const details = doctorJobs.map((j) => detailMap.get(j.externalUrl) ?? null);
 
-    // Resolve trusts (prefer detail page employer name as it's canonical)
-    const trustNames = doctorJobs.map((job, i) =>
-      details[i]?.trustName ?? job.trustName
-    );
+    // Resolve trusts again using canonical names from detail pages
+    const trustNames = doctorJobs.map((job, i) => details[i]?.trustName ?? job.trustName);
     const trustMap = await resolveTrusts(trustNames);
 
-    // Build upsert rows
+    // Build enriched upsert rows (overwrites basic rows with full data)
     const rows = doctorJobs.map((job, i) => {
       const detail = details[i];
       const trustName = detail?.trustName ?? job.trustName;
