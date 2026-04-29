@@ -1,11 +1,16 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { createHmac } from "crypto";
 import type { Metadata } from "next";
 import Navbar from "../../components/navbar";
 import BookmarkButton from "../../components/bookmark-button";
 import ShareButton from "../../components/share-button";
 import ReportClosedButton from "../../components/report-closed-button";
 import { supabase, formatSalary, type DBJobListing } from "../../lib/supabase";
+
+function closeToken(jobId: string) {
+  return createHmac("sha256", process.env.CRON_SECRET!).update(jobId).digest("hex");
+}
 
 export async function generateMetadata({
   params,
@@ -420,7 +425,7 @@ export default async function JobDetailPage({
                   You will be redirected to {job.source}
                 </p>
                 <div className="mt-4 border-t border-gray-100 pt-4">
-                  <ReportClosedButton jobId={job.id} />
+                  <ReportClosedButton jobId={job.id} token={closeToken(job.id)} />
                 </div>
               </div>
 

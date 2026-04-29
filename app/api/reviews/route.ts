@@ -15,8 +15,14 @@ export async function POST(req: Request) {
   if (!trust_id || overall_rating == null) {
     return NextResponse.json({ error: "trust_id and overall_rating are required." }, { status: 400 });
   }
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(trust_id)) {
+    return NextResponse.json({ error: "Invalid trust_id." }, { status: 400 });
+  }
   if (![1, 2, 3, 4, 5].includes(overall_rating)) {
     return NextResponse.json({ error: "overall_rating must be 1–5." }, { status: 400 });
+  }
+  if (review_text && review_text.length > 2000) {
+    return NextResponse.json({ error: "review_text must be 2000 characters or fewer." }, { status: 400 });
   }
 
   const { error } = await supabase.from("trust_reviews").insert({

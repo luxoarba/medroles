@@ -2,13 +2,17 @@
 
 import { useState } from "react";
 
-export default function ReportClosedButton({ jobId }: { jobId: string }) {
+export default function ReportClosedButton({ jobId, token }: { jobId: string; token: string }) {
   const [state, setState] = useState<"idle" | "confirming" | "loading" | "done">("idle");
 
   async function confirm() {
     setState("loading");
     try {
-      const res = await fetch(`/api/jobs/${jobId}/close`, { method: "POST" });
+      const res = await fetch(`/api/jobs/${jobId}/close`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token }),
+      });
       if (res.ok) {
         setState("done");
       } else {

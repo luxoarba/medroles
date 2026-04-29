@@ -1,13 +1,37 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { createHmac, timingSafeEqual } from "crypto";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!,
 );
 
-export async function POST(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+
+  if (!UUID_RE.test(id)) {
+    return NextResponse.json({ error: "Invalid job ID" }, { status: 400 });
+  }
+
+  const body = await req.json().catch(() => null);
+  const provided: string = body?.token ?? "";
+  const expected = createHmac("sha256", process.env.CRON_SECRET!).update(id).digest("hex");
+
+  let valid = false;
+  try {
+    valid =
+      provided.length === expected.length &&
+      timingSafeEqual(Buffer.from(provided), Buffer.from(expected));
+  } catch {
+    valid = false;
+  }
+
+  if (!valid) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
   const yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);
