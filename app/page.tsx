@@ -345,8 +345,8 @@ export default async function Home() {
             <span>· © 2026</span>
           </div>
           <div className="flex gap-5">
-            <a href="#" className="hover:text-gray-600 transition-colors">Privacy</a>
-            <a href="#" className="hover:text-gray-600 transition-colors">Terms</a>
+            <Link href="/privacy" className="hover:text-gray-600 transition-colors">Privacy</Link>
+            <Link href="/terms" className="hover:text-gray-600 transition-colors">Terms</Link>
             <a href="#" className="hover:text-gray-600 transition-colors">For trusts</a>
             <a href="#" className="hover:text-gray-600 transition-colors">Contact</a>
           </div>
