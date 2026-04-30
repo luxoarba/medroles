@@ -212,11 +212,11 @@ function relativeTime(isoString: string): string {
 async function fetchLastUpdated(): Promise<string | null> {
   const { data } = await supabase
     .from("job_listings")
-    .select("created_at")
-    .order("created_at", { ascending: false })
+    .select("updated_at")
+    .order("updated_at", { ascending: false })
     .limit(1)
     .single();
-  return data?.created_at ?? null;
+  return data?.updated_at ?? null;
 }
 
 async function fetchJobs(
@@ -301,16 +301,22 @@ async function fetchJobs(
   const raw = (data ?? []) as unknown as DBJobListing[];
 
   // Deduplicate: NHS Jobs and Trac sometimes list the same vacancy.
-  // Keep the NHS Jobs copy when both exist (same title + trust + closing date).
+  // Key on title + trust only — closes_at differs between sources for the same job.
+  // Prefer: NHS Jobs > has closes_at > Trac unenriched.
   const seen = new Map<string, DBJobListing>();
   for (const job of raw) {
-    const key = `${job.title.toLowerCase().trim()}|${job.trust_id ?? ""}|${job.closes_at ?? ""}`;
+    const key = `${job.title.toLowerCase().trim()}|${job.trust_id ?? ""}`;
     const existing = seen.get(key);
     if (!existing) {
       seen.set(key, job);
-    } else if (existing.source !== "NHS Jobs" && job.source === "NHS Jobs") {
-      // Prefer NHS Jobs copy
-      seen.set(key, job);
+    } else {
+      const existingIsNHS = existing.source === "NHS Jobs";
+      const jobIsNHS = job.source === "NHS Jobs";
+      if (!existingIsNHS && jobIsNHS) {
+        seen.set(key, job);
+      } else if (existingIsNHS === jobIsNHS && !existing.closes_at && job.closes_at) {
+        seen.set(key, job);
+      }
     }
   }
 
