@@ -513,8 +513,11 @@ Deno.serve(async () => {
     // Resolve trusts (creates any missing ones with inferred type)
     const trustMap = await resolveTrusts(doctorJobs.map((j) => j.employer));
 
-    // Build upsert rows
-    const rows = doctorJobs.map((job) => {
+    // Phase 1: upsert basic listing data for ALL jobs.
+    // description/requirements/benefits are intentionally excluded so that
+    // previously enriched content is never overwritten by a null value when
+    // a job falls outside the per-run enrichment cap.
+    const basicRows = doctorJobs.map((job) => {
       const { min, max } = parseSalary(job.salary);
       return {
         title: job.title,
@@ -527,9 +530,6 @@ Deno.serve(async () => {
         salary_max: max,
         closes_at: job.closeDate,
         posted_at: job.postDate,
-        description: job.description,
-        requirements: job.requirements,
-        benefits: job.benefits,
         external_url: job.url,
         source: "NHS Jobs",
         category: "Medical and Dental",
@@ -543,13 +543,57 @@ Deno.serve(async () => {
 
     const { error: upsertError } = await supabase
       .from("job_listings")
-      .upsert(rows, { onConflict: "external_url", ignoreDuplicates: false });
+      .upsert(basicRows, { onConflict: "external_url", ignoreDuplicates: false });
 
     if (upsertError) {
       stats.errors++;
       console.error("batch upsert error:", upsertError.message);
     } else {
-      stats.upserted = rows.length;
+      stats.upserted = basicRows.length;
+    }
+
+    // Phase 2: write enriched content only for jobs that succeeded in this run.
+    const enrichedJobs = toEnrich.filter(
+      (j) => j.requirements !== null || j.benefits !== null || j.description !== null,
+    );
+    if (enrichedJobs.length > 0) {
+      const enrichedRows = enrichedJobs.map((job) => {
+        const { min, max } = parseSalary(job.salary);
+        return {
+          title: job.title,
+          trust_id: trustMap.get(job.employer) ?? null,
+          region: job.location?.replace(/<[^>]+>/g, "").trim() || null,
+          grade: inferGrade(job.title),
+          specialty: inferSpecialty(job.title),
+          contract_type: mapContractType(job.type),
+          salary_min: min,
+          salary_max: max,
+          closes_at: job.closeDate,
+          posted_at: job.postDate,
+          description: job.description,
+          requirements: job.requirements,
+          benefits: job.benefits,
+          external_url: job.url,
+          source: "NHS Jobs",
+          category: "Medical and Dental",
+          pay_band: null,
+          on_call: null,
+          training_post: null,
+          is_active: true,
+          cesr_support: false,
+        };
+      });
+
+      const { error: enrichError } = await supabase
+        .from("job_listings")
+        .upsert(enrichedRows, { onConflict: "external_url", ignoreDuplicates: false });
+
+      if (enrichError) {
+        stats.errors++;
+        console.error("enriched upsert error:", enrichError.message);
+      } else {
+        stats.enriched = enrichedRows.length;
+      }
     }
 
     // Delete expired NHS Jobs listings
