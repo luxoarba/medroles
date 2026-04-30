@@ -9,9 +9,9 @@ const XML_API = "https://www.jobs.nhs.uk/api/v1/search_xml";
 const SAFETY_PAGE_CAP = 500;
 const PAGE_BATCH_SIZE = 10;
 const DELAY_MS = 100;
-const DETAIL_BATCH_SIZE = 5;
+const DETAIL_BATCH_SIZE = 10;
 const DETAIL_DELAY_MS = 250;
-const MAX_DETAIL_FETCHES = 400; // per run — prioritises jobs not yet enriched
+const MAX_DETAIL_FETCHES = 600; // per run — prioritises jobs not yet enriched
 
 const DOCTOR_KEYWORDS = [
   "consultant",
