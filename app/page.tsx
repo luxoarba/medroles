@@ -50,8 +50,27 @@ async function fetchGradeCounts(): Promise<Record<string, number>> {
   return Object.fromEntries(results);
 }
 
+async function fetchStats() {
+  const today = new Date().toISOString().slice(0, 10);
+  const [{ count: jobCount }, { count: trustCount }, { data: reviews }] =
+    await Promise.all([
+      supabase
+        .from("job_listings")
+        .select("*", { count: "exact", head: true })
+        .or(`closes_at.gte.${today},closes_at.is.null`),
+      supabase.from("trusts").select("*", { count: "exact", head: true }),
+      supabase.from("trust_reviews").select("overall_rating"),
+    ]);
+  const reviewCount = reviews?.length ?? 0;
+  const avgRating =
+    reviewCount > 0
+      ? reviews!.reduce((s, r) => s + r.overall_rating, 0) / reviewCount
+      : null;
+  return { jobCount: jobCount ?? 0, trustCount: trustCount ?? 0, reviewCount, avgRating };
+}
+
 export default async function Home() {
-  const gradeCounts = await fetchGradeCounts();
+  const [gradeCounts, stats] = await Promise.all([fetchGradeCounts(), fetchStats()]);
   return (
     <div className="min-h-screen bg-white">
       <AutoScrape />
@@ -122,30 +141,30 @@ export default async function Home() {
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-center gap-x-16 gap-y-6 px-6 py-10">
           <div className="text-center">
             <p className="text-4xl font-bold tabular-nums text-gray-900">
-              <span className="text-emerald-600">700+</span>
+              <span className="text-emerald-600">{stats.jobCount.toLocaleString("en-GB")}</span>
             </p>
             <p className="mt-1 text-sm text-gray-500">live roles</p>
           </div>
           <div className="hidden h-12 w-px bg-gray-200 lg:block" />
           <div className="text-center">
             <p className="text-4xl font-bold tabular-nums text-gray-900">
-              <span className="text-emerald-600">200+</span>
+              <span className="text-emerald-600">{stats.trustCount}</span>
             </p>
             <p className="mt-1 text-sm text-gray-500">NHS trusts listed</p>
           </div>
           <div className="hidden h-12 w-px bg-gray-200 lg:block" />
           <div className="text-center">
             <p className="text-4xl font-bold tabular-nums text-gray-900">
-              <span className="text-emerald-600">Real</span>
+              <span className="text-emerald-600">{stats.reviewCount}</span>
             </p>
             <p className="mt-1 text-sm text-gray-500">doctor reviews</p>
           </div>
           <div className="hidden h-12 w-px bg-gray-200 lg:block" />
           <div className="text-center">
             <p className="text-4xl font-bold tabular-nums text-gray-900">
-              <span className="text-emerald-600">Always</span>
+              <span className="text-emerald-600">30min</span>
             </p>
-            <p className="mt-1 text-sm text-gray-500">up to date</p>
+            <p className="mt-1 text-sm text-gray-500">update frequency</p>
           </div>
         </div>
       </section>
@@ -277,20 +296,26 @@ export default async function Home() {
                 you apply.
               </p>
               <div className="mt-5 flex items-center gap-1.5">
-                {[1, 2, 3, 4, 5].map((s) => (
-                  <svg
-                    key={s}
-                    viewBox="0 0 20 20"
-                    fill={s <= 4 ? "#059669" : "none"}
-                    stroke={s <= 4 ? "#059669" : "#d1d5db"}
-                    className="h-4 w-4"
-                  >
-                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                  </svg>
-                ))}
-                <span className="ml-1 text-xs font-medium text-gray-500">
-                  4.2 · 38 reviews
-                </span>
+                {stats.avgRating != null ? (
+                  <>
+                    {[1, 2, 3, 4, 5].map((s) => (
+                      <svg
+                        key={s}
+                        viewBox="0 0 20 20"
+                        fill={s <= Math.round(stats.avgRating!) ? "#059669" : "none"}
+                        stroke={s <= Math.round(stats.avgRating!) ? "#059669" : "#d1d5db"}
+                        className="h-4 w-4"
+                      >
+                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                      </svg>
+                    ))}
+                    <span className="ml-1 text-xs font-medium text-gray-500">
+                      {stats.avgRating.toFixed(1)} · {stats.reviewCount} {stats.reviewCount === 1 ? "review" : "reviews"}
+                    </span>
+                  </>
+                ) : (
+                  <span className="text-xs text-gray-400">Be the first to leave a review →</span>
+                )}
               </div>
             </div>
 
