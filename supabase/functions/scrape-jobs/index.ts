@@ -382,6 +382,13 @@ function inferSpecialty(title: string): string | null {
   return null;
 }
 
+function inferTrainingPost(grade: string | null): boolean | null {
+  if (!grade) return null;
+  if (/^(FY1|FY2|CT1|CT2|ST[3-9])$/.test(grade)) return true;
+  if (/^(SAS|Consultant)$/.test(grade)) return false;
+  return null;
+}
+
 function inferTrustType(name: string): string | null {
   const n = name.toLowerCase();
   if (/mental health/.test(n)) return "Mental Health";
@@ -519,11 +526,12 @@ Deno.serve(async () => {
     // a job falls outside the per-run enrichment cap.
     const basicRows = doctorJobs.map((job) => {
       const { min, max } = parseSalary(job.salary);
+      const grade = inferGrade(job.title);
       return {
         title: job.title,
         trust_id: trustMap.get(job.employer) ?? null,
         region: job.location?.replace(/<[^>]+>/g, "").trim() || null,
-        grade: inferGrade(job.title),
+        grade,
         specialty: inferSpecialty(job.title),
         contract_type: mapContractType(job.type),
         salary_min: min,
@@ -535,7 +543,7 @@ Deno.serve(async () => {
         category: "Medical and Dental",
         pay_band: null,
         on_call: null,
-        training_post: null,
+        training_post: inferTrainingPost(grade),
         is_active: true,
         cesr_support: false,
       };
@@ -559,11 +567,12 @@ Deno.serve(async () => {
     if (enrichedJobs.length > 0) {
       const enrichedRows = enrichedJobs.map((job) => {
         const { min, max } = parseSalary(job.salary);
+        const grade = inferGrade(job.title);
         return {
           title: job.title,
           trust_id: trustMap.get(job.employer) ?? null,
           region: job.location?.replace(/<[^>]+>/g, "").trim() || null,
-          grade: inferGrade(job.title),
+          grade,
           specialty: inferSpecialty(job.title),
           contract_type: mapContractType(job.type),
           salary_min: min,
@@ -578,7 +587,7 @@ Deno.serve(async () => {
           category: "Medical and Dental",
           pay_band: null,
           on_call: null,
-          training_post: null,
+          training_post: inferTrainingPost(grade),
           is_active: true,
           cesr_support: false,
         };

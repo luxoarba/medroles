@@ -153,6 +153,22 @@ export default async function JobDetailPage({
       )
     : null;
 
+  const postedRelative = job.posted_at
+    ? (() => {
+        const days = Math.round(
+          (Date.now() - new Date(job.posted_at).getTime()) / (1000 * 60 * 60 * 24),
+        );
+        if (days === 0) return "Today";
+        if (days === 1) return "Yesterday";
+        if (days < 7) return `${days} days ago`;
+        if (days < 60) return `${Math.round(days / 7)} weeks ago`;
+        return new Date(job.posted_at).toLocaleDateString("en-GB", {
+          day: "numeric",
+          month: "short",
+        });
+      })()
+    : null;
+
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "JobPosting",
@@ -249,6 +265,11 @@ export default async function JobDetailPage({
                         {job.contract_type}
                       </span>
                     )}
+                    {job.training_post === true && (
+                      <span className="rounded-md bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200">
+                        Training post
+                      </span>
+                    )}
                   </div>
                   <h1 className="mb-1 text-2xl font-bold text-gray-900">
                     {job.title}
@@ -291,10 +312,10 @@ export default async function JobDetailPage({
                 </div>
                 <div>
                   <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">
-                    On-call
+                    Training post
                   </p>
                   <p className="mt-1 text-sm font-semibold text-gray-800">
-                    {job.on_call === null ? "—" : job.on_call ? "Yes" : "No"}
+                    {job.training_post === null ? "Unknown" : job.training_post ? "Yes" : "No"}
                   </p>
                 </div>
                 <div>
@@ -307,10 +328,10 @@ export default async function JobDetailPage({
                 </div>
                 <div>
                   <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">
-                    Source
+                    Posted
                   </p>
                   <p className="mt-1 text-sm font-semibold text-gray-800">
-                    {job.source}
+                    {postedRelative ?? "—"}
                   </p>
                 </div>
               </div>
