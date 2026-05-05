@@ -11,7 +11,7 @@ const PAGE_BATCH_SIZE = 10;
 const DELAY_MS = 100;
 const DETAIL_BATCH_SIZE = 10;
 const DETAIL_DELAY_MS = 250;
-const MAX_DETAIL_FETCHES = 600; // per run — prioritises jobs not yet enriched
+const MAX_DETAIL_FETCHES = 150; // per run — 30min cron means 4,320 enrichments/day
 
 const DOCTOR_KEYWORDS = [
   "consultant",
