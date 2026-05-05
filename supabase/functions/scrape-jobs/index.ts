@@ -261,6 +261,24 @@ async function fetchVacancyDetail(job: ParsedJob): Promise<void> {
       const salaryText = extractById(html, "fixed_salary");
       if (salaryText) job.salary = salaryText;
     }
+
+    // Closing date from page if XML didn't include it.
+    // The page renders: <p id="closing_date">The closing date is 10 May 2026</p>
+    if (!job.closeDate) {
+      const MONTHS: Record<string, string> = {
+        january: "01", february: "02", march: "03", april: "04",
+        may: "05", june: "06", july: "07", august: "08",
+        september: "09", october: "10", november: "11", december: "12",
+      };
+      const m = html.match(
+        /id="closing_date"[^>]*>[\s\S]{0,200}?(\d{1,2})\s+(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{4})/i,
+      );
+      if (m) {
+        const day = m[1].padStart(2, "0");
+        const month = MONTHS[m[2].toLowerCase()];
+        job.closeDate = `${m[3]}-${month}-${day}`;
+      }
+    }
   } catch (e) {
     console.error(`detail fetch failed for ${job.url}:`, e);
   }
@@ -524,6 +542,8 @@ Deno.serve(async () => {
     // description/requirements/benefits are intentionally excluded so that
     // previously enriched content is never overwritten by a null value when
     // a job falls outside the per-run enrichment cap.
+    // closes_at is also omitted when null for the same reason: the detail
+    // page may have already populated it, and the XML doesn't always include it.
     const basicRows = doctorJobs.map((job) => {
       const { min, max } = parseSalary(job.salary);
       const grade = inferGrade(job.title);
@@ -536,7 +556,7 @@ Deno.serve(async () => {
         contract_type: mapContractType(job.type),
         salary_min: min,
         salary_max: max,
-        closes_at: job.closeDate,
+        ...(job.closeDate ? { closes_at: job.closeDate } : {}),
         posted_at: job.postDate,
         external_url: job.url,
         source: "NHS Jobs",
@@ -608,25 +628,13 @@ Deno.serve(async () => {
     // Delete expired NHS Jobs listings (closing date in the past)
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - 1);
-    const { count: expiredCount } = await supabase
+    const { count } = await supabase
       .from("job_listings")
       .delete({ count: "exact" })
       .eq("source", "NHS Jobs")
       .lt("closes_at", cutoff.toISOString().slice(0, 10));
 
-    // Delete NHS Jobs listings with no closing date not seen in the last 2 days.
-    // The scraper upserts (ignoreDuplicates:false) every 30 min, refreshing updated_at
-    // via trigger. A null-closes_at row not refreshed in 2 days is gone from NHS Jobs.
-    const staleCutoff = new Date();
-    staleCutoff.setDate(staleCutoff.getDate() - 2);
-    const { count: staleCount } = await supabase
-      .from("job_listings")
-      .delete({ count: "exact" })
-      .eq("source", "NHS Jobs")
-      .is("closes_at", null)
-      .lt("updated_at", staleCutoff.toISOString());
-
-    stats.deleted = (expiredCount ?? 0) + (staleCount ?? 0);
+    stats.deleted = count ?? 0;
   } catch (e) {
     return new Response(JSON.stringify({ error: String(e) }), {
       status: 500,
