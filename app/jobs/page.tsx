@@ -292,6 +292,9 @@ async function fetchJobs(
     query = query.order("closes_at", { ascending: true });
   }
 
+  // Raise the PostgREST default 1000-row cap so dedup sees the full result set
+  query = query.limit(10000);
+
   const { data, error } = await query;
 
   if (error) {

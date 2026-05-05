@@ -51,22 +51,19 @@ async function fetchGradeCounts(): Promise<Record<string, number>> {
 }
 
 async function fetchStats() {
-  const today = new Date().toISOString().slice(0, 10);
-  const [{ count: jobCount }, { count: trustCount }, { data: reviews }] =
+  const [{ data: jobCountRaw }, { count: trustCount }, { data: reviews }] =
     await Promise.all([
-      supabase
-        .from("job_listings")
-        .select("*", { count: "exact", head: true })
-        .or(`closes_at.gte.${today},closes_at.is.null`),
+      supabase.rpc("live_job_count"),
       supabase.from("trusts").select("*", { count: "exact", head: true }),
       supabase.from("trust_reviews").select("overall_rating"),
     ]);
+  const jobCount = (jobCountRaw as number) ?? 0;
   const reviewCount = reviews?.length ?? 0;
   const avgRating =
     reviewCount > 0
       ? reviews!.reduce((s, r) => s + r.overall_rating, 0) / reviewCount
       : null;
-  return { jobCount: jobCount ?? 0, trustCount: trustCount ?? 0, reviewCount, avgRating };
+  return { jobCount, trustCount: trustCount ?? 0, reviewCount, avgRating };
 }
 
 export default async function Home() {

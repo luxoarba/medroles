@@ -605,16 +605,28 @@ Deno.serve(async () => {
       }
     }
 
-    // Delete expired NHS Jobs listings
+    // Delete expired NHS Jobs listings (closing date in the past)
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - 1);
-    const { count } = await supabase
+    const { count: expiredCount } = await supabase
       .from("job_listings")
       .delete({ count: "exact" })
       .eq("source", "NHS Jobs")
       .lt("closes_at", cutoff.toISOString().slice(0, 10));
 
-    stats.deleted = count ?? 0;
+    // Delete NHS Jobs listings with no closing date not seen in the last 2 days.
+    // The scraper upserts (ignoreDuplicates:false) every 30 min, refreshing updated_at
+    // via trigger. A null-closes_at row not refreshed in 2 days is gone from NHS Jobs.
+    const staleCutoff = new Date();
+    staleCutoff.setDate(staleCutoff.getDate() - 2);
+    const { count: staleCount } = await supabase
+      .from("job_listings")
+      .delete({ count: "exact" })
+      .eq("source", "NHS Jobs")
+      .is("closes_at", null)
+      .lt("updated_at", staleCutoff.toISOString());
+
+    stats.deleted = (expiredCount ?? 0) + (staleCount ?? 0);
   } catch (e) {
     return new Response(JSON.stringify({ error: String(e) }), {
       status: 500,
