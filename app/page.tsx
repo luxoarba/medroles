@@ -54,7 +54,7 @@ async function fetchStats() {
   const [{ data: jobCountRaw }, { count: trustCount }, { data: reviews }] =
     await Promise.all([
       supabase.rpc("live_job_count"),
-      supabase.from("trusts").select("*", { count: "exact", head: true }),
+      supabase.from("trusts").select("*", { count: "exact", head: true }).eq("is_nhs", true),
       supabase.from("trust_reviews").select("overall_rating"),
     ]);
   const jobCount = (jobCountRaw as number) ?? 0;
