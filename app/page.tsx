@@ -51,10 +51,9 @@ async function fetchGradeCounts(): Promise<Record<string, number>> {
 }
 
 async function fetchStats() {
-  const [{ data: jobCountRaw }, { count: trustCount }, { data: reviews }] =
+  const [{ data: jobCountRaw }, { data: reviews }] =
     await Promise.all([
       supabase.rpc("live_job_count"),
-      supabase.from("trusts").select("*", { count: "exact", head: true }).eq("is_nhs", true),
       supabase.from("trust_reviews").select("overall_rating"),
     ]);
   const jobCount = (jobCountRaw as number) ?? 0;
@@ -63,7 +62,7 @@ async function fetchStats() {
     reviewCount > 0
       ? reviews!.reduce((s, r) => s + r.overall_rating, 0) / reviewCount
       : null;
-  return { jobCount, trustCount: trustCount ?? 0, reviewCount, avgRating };
+  return { jobCount, reviewCount, avgRating };
 }
 
 export default async function Home() {
@@ -144,10 +143,10 @@ export default async function Home() {
           </div>
           <div className="hidden h-12 w-px bg-gray-200 lg:block" />
           <div className="text-center">
-            <p className="text-4xl font-bold tabular-nums text-gray-900">
-              <span className="text-emerald-600">{stats.trustCount}</span>
+            <p className="text-4xl font-bold text-gray-900">
+              <span className="text-emerald-600">All</span>
             </p>
-            <p className="mt-1 text-sm text-gray-500">NHS trusts listed</p>
+            <p className="mt-1 text-sm text-gray-500">NHS live roles</p>
           </div>
           <div className="hidden h-12 w-px bg-gray-200 lg:block" />
           <div className="text-center">
