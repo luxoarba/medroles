@@ -9,7 +9,7 @@ const BASE_URL = "https://www.healthjobsuk.com";
 const LIST_PATH = "/job_list/Medical_and_Dental";
 const SAFETY_PAGE_CAP = 200; // confirmed 137 pages as of Apr 2026; 200 gives headroom
 const LIST_DELAY_MS = 150;
-const DETAIL_CONCURRENCY = 8; // fetch detail pages in batches of 8
+const DETAIL_CONCURRENCY = 3; // low concurrency to reduce Cloudflare challenge rate
 const MAX_DETAIL_FETCHES = 300; // per run — prioritise unenriched jobs, same pattern as scrape-jobs
 
 interface ParsedJob {
@@ -405,6 +405,16 @@ async function fetchDetail(url: string): Promise<DetailData | null> {
     const res = await fetch(url, { headers: HEADERS });
     if (!res.ok) return null;
     const html = await res.text();
+    // Cloudflare challenge pages return 200 OK but contain no job content.
+    // Treat them as failures so we don't overwrite existing DB data with nulls.
+    if (
+      html.includes("_cf_chl_opt") ||
+      html.includes("challenge-error-text") ||
+      html.includes("Enable JavaScript and cookies to continue") ||
+      html.includes("Completing the CAPTCHA")
+    ) {
+      return null;
+    }
     return parseDetailPage(html);
   } catch {
     return null;
@@ -502,49 +512,66 @@ Deno.serve(async () => {
     stats.upserted = basicRows.length;
 
     // Phase 2: enrich with detail pages (best-effort — timeout here is acceptable).
-    // Skip detail fetches for jobs already enriched in DB.
-    const { data: alreadyEnriched } = await supabase
+    // Priority: (1) no closing date yet, (2) no requirements yet, (3) fully enriched (refresh).
+    // Jobs beyond MAX_DETAIL_FETCHES are skipped entirely — their existing DB data is preserved.
+    const { data: haveClosing } = await supabase
+      .from("job_listings")
+      .select("external_url")
+      .eq("source", "Trac Jobs")
+      .not("closes_at", "is", null);
+    const haveClosingUrls = new Set((haveClosing ?? []).map((r: { external_url: string }) => r.external_url));
+
+    const { data: haveRequirements } = await supabase
       .from("job_listings")
       .select("external_url")
       .eq("source", "Trac Jobs")
       .not("requirements", "is", null);
-    const enrichedUrls = new Set((alreadyEnriched ?? []).map((r: { external_url: string }) => r.external_url));
+    const haveRequirementsUrls = new Set((haveRequirements ?? []).map((r: { external_url: string }) => r.external_url));
 
+    // Priority queue: missing closing date → missing requirements → fully enriched
     const toEnrich = [
-      ...doctorJobs.filter((j) => !enrichedUrls.has(j.externalUrl)),
-      ...doctorJobs.filter((j) => enrichedUrls.has(j.externalUrl)),
+      ...doctorJobs.filter((j) => !haveClosingUrls.has(j.externalUrl)),
+      ...doctorJobs.filter((j) => haveClosingUrls.has(j.externalUrl) && !haveRequirementsUrls.has(j.externalUrl)),
+      ...doctorJobs.filter((j) => haveClosingUrls.has(j.externalUrl) && haveRequirementsUrls.has(j.externalUrl)),
     ].slice(0, MAX_DETAIL_FETCHES);
 
-    // Fetch detail pages only for the capped set; null-fill the rest
-    const detailMap = new Map<string, DetailData | null>();
+    // Fetch detail pages for the toEnrich subset only
     const fetched = await batchMap(toEnrich, DETAIL_CONCURRENCY, (job) => fetchDetail(job.externalUrl));
-    for (let i = 0; i < toEnrich.length; i++) detailMap.set(toEnrich[i].externalUrl, fetched[i]);
 
-    const details = doctorJobs.map((j) => detailMap.get(j.externalUrl) ?? null);
+    // Resolve trusts from canonical names returned by detail pages
+    const enrichTrustNames = toEnrich.map((job, i) => fetched[i]?.trustName ?? job.trustName);
+    const enrichTrustMap = await resolveTrusts(enrichTrustNames);
 
-    // Resolve trusts again using canonical names from detail pages
-    const trustNames = doctorJobs.map((job, i) => details[i]?.trustName ?? job.trustName);
-    const trustMap = await resolveTrusts(trustNames);
+    // Build enriched upsert rows ONLY for jobs that had a successful detail fetch.
+    // Use conditional spreading so null from a failed/blocked fetch never overwrites
+    // a previously-stored non-null value in the database.
+    const enrichedRows: object[] = [];
+    for (let i = 0; i < toEnrich.length; i++) {
+      const job = toEnrich[i];
+      const detail = fetched[i];
+      // Skip failed fetches (null = fetch error or Cloudflare challenge)
+      if (!detail) continue;
+      // Skip if detail page returned no content at all (another form of failed parse)
+      if (!detail.closingDate && !detail.description && !detail.requirements && !detail.benefits) continue;
 
-    // Build enriched upsert rows (overwrites basic rows with full data)
-    const rows = doctorJobs.map((job, i) => {
-      const detail = details[i];
-      const trustName = detail?.trustName ?? job.trustName;
-      const salaryText = detail?.salaryText ?? job.salaryText;
+      const trustName = detail.trustName ?? job.trustName;
+      const salaryText = detail.salaryText ?? job.salaryText;
       const { min, max } = parseSalary(salaryText);
-      return {
+
+      enrichedRows.push({
         title: job.title,
-        trust_id: trustMap.get(trustName) ?? null,
-        region: (detail?.location ?? job.location)?.replace(/<[^>]+>/g, "").trim() || null,
-        grade: detail?.grade ?? inferGrade(job.title),
+        trust_id: enrichTrustMap.get(trustName) ?? null,
+        region: (detail.location ?? job.location)?.replace(/<[^>]+>/g, "").trim() || null,
+        grade: detail.grade ?? inferGrade(job.title),
         specialty: inferSpecialty(job.title),
-        contract_type: detail?.contractType ?? null,
+        contract_type: detail.contractType ?? null,
         salary_min: min,
         salary_max: max,
-        closes_at: detail?.closingDate ?? null,
-        description: detail?.description ?? null,
-        requirements: detail?.requirements ?? null,
-        benefits: detail?.benefits ?? null,
+        // Only set a field if the new value is non-null — never overwrite with null
+        ...(detail.closingDate ? { closes_at: detail.closingDate } : {}),
+        ...(detail.description ? { description: detail.description } : {}),
+        ...(detail.requirements?.length ? { requirements: detail.requirements } : {}),
+        ...(detail.benefits?.length ? { benefits: detail.benefits } : {}),
         posted_at: null,
         external_url: job.externalUrl,
         source: "Trac Jobs",
@@ -554,29 +581,27 @@ Deno.serve(async () => {
         training_post: null,
         is_active: true,
         cesr_support: false,
-      };
-    });
-
-    const { error: upsertError } = await supabase
-      .from("job_listings")
-      .upsert(rows, { onConflict: "external_url", ignoreDuplicates: false });
-
-    if (upsertError) {
-      stats.errors++;
-      console.error("batch upsert error:", upsertError.message);
-    } else {
-      stats.upserted = rows.length;
-
-      // Delete Trac Jobs listings no longer on the site
-      const liveUrls = rows.map((r) => r.external_url);
-      const { count } = await supabase
-        .from("job_listings")
-        .delete({ count: "exact" })
-        .eq("source", "Trac Jobs")
-        .not("external_url", "in", `(${liveUrls.map((u) => `"${u}"`).join(",")})`);
-
-      stats.deleted = count ?? 0;
+      });
     }
+
+    if (enrichedRows.length > 0) {
+      const { error: upsertError } = await supabase
+        .from("job_listings")
+        .upsert(enrichedRows, { onConflict: "external_url", ignoreDuplicates: false });
+      if (upsertError) {
+        stats.errors++;
+        console.error("enriched upsert error:", upsertError.message);
+      }
+    }
+
+    // Delete Trac jobs no longer live on the site (based on ALL doctor jobs, not just enriched)
+    const liveUrls = doctorJobs.map((j) => j.externalUrl);
+    const { count } = await supabase
+      .from("job_listings")
+      .delete({ count: "exact" })
+      .eq("source", "Trac Jobs")
+      .not("external_url", "in", `(${liveUrls.map((u) => `"${u}"`).join(",")})`);
+    stats.deleted = count ?? 0;
   } catch (e) {
     return new Response(JSON.stringify({ error: String(e) }), {
       status: 500,
