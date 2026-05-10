@@ -6,6 +6,7 @@ export default async function TrustsPage() {
   const { data: trusts } = await supabase
     .from("trusts")
     .select("id, name, type, avg_rating, review_count, job_listings(count)")
+    .eq("is_nhs", true)
     .order("name");
 
   const rows = (trusts ?? []).map((t) => {

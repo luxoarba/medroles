@@ -407,6 +407,17 @@ function inferTrainingPost(grade: string | null): boolean | null {
   return null;
 }
 
+function isNhsOrganisation(name: string): boolean {
+  return (
+    name.includes("NHS") ||
+    name.includes("Foundation Trust") ||
+    name.includes("Health Board") ||
+    name.includes("Teaching Hospitals") ||
+    name.includes("University Hospitals") ||
+    name.includes("University Hospital")
+  );
+}
+
 function inferTrustType(name: string): string | null {
   const n = name.toLowerCase();
   if (/mental health/.test(n)) return "Mental Health";
@@ -450,7 +461,7 @@ async function resolveTrusts(
     const { data: created } = await supabase
       .from("trusts")
       .upsert(
-        missing.map((name) => ({ name, type: inferTrustType(name) })),
+        missing.map((name) => ({ name, type: inferTrustType(name), is_nhs: isNhsOrganisation(name) })),
         { onConflict: "name", ignoreDuplicates: false },
       )
       .select("id, name");

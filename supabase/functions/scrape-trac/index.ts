@@ -354,6 +354,17 @@ function inferSpecialty(title: string): string | null {
   return null;
 }
 
+function isNhsOrganisation(name: string): boolean {
+  return (
+    name.includes("NHS") ||
+    name.includes("Foundation Trust") ||
+    name.includes("Health Board") ||
+    name.includes("Teaching Hospitals") ||
+    name.includes("University Hospitals") ||
+    name.includes("University Hospital")
+  );
+}
+
 // --- DB helpers ---
 
 async function resolveTrusts(names: string[]): Promise<Map<string, string>> {
@@ -372,7 +383,7 @@ async function resolveTrusts(names: string[]): Promise<Map<string, string>> {
     const { data: created } = await supabase
       .from("trusts")
       .upsert(
-        missing.map((name) => ({ name })),
+        missing.map((name) => ({ name, is_nhs: isNhsOrganisation(name) })),
         { onConflict: "name", ignoreDuplicates: false },
       )
       .select("id, name");
