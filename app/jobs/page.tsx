@@ -229,79 +229,75 @@ async function fetchJobs(
   },
   page: number,
 ): Promise<{ jobs: DBJobListing[]; total: number }> {
-  let query = supabase
-    .from("job_listings")
-    .select(`
-      id,
-      trust_id,
-      title,
-      specialty,
-      grade,
-      contract_type,
-      region,
-      pay_band,
-      salary_min,
-      salary_max,
-      on_call,
-      training_post,
-      closes_at,
-      posted_at,
-      source,
-      external_url,
-      trusts (
-        name,
-        avg_rating,
-        review_count,
-        type,
-        cqc_overall
-      )
-    `)
-    // Only show jobs that close today or later
-    .or(`closes_at.gte.${new Date().toISOString().slice(0, 10)},closes_at.is.null`);
+  const today = new Date().toISOString().slice(0, 10);
 
-  if (filters.specialty.length > 0) query = query.in("specialty", filters.specialty);
-  if (filters.grade.length > 0) query = query.in("grade", filters.grade);
-  if (filters.deanery.length > 0) {
-    const cities = filters.deanery.flatMap((d) => DEANERY_REGIONS[d] ?? []);
-    if (cities.length > 0) {
-      query = query.or(cities.map((c) => `region.ilike.%${c}%`).join(","));
-    }
-  }
-
+  // Resolve search trust IDs first so the helper can be synchronous
+  let searchTrustIds: string[] = [];
   if (filters.search) {
-    // Find trust IDs whose name matches, then OR against title
     const { data: matchingTrusts } = await supabase
       .from("trusts")
       .select("id")
       .ilike("name", `%${filters.search}%`);
-    const trustIds = (matchingTrusts ?? []).map((t: { id: string }) => t.id);
-    if (trustIds.length > 0) {
-      query = query.or(
-        `title.ilike.%${filters.search}%,trust_id.in.(${trustIds.join(",")})`,
-      );
-    } else {
-      query = query.ilike("title", `%${filters.search}%`);
+    searchTrustIds = (matchingTrusts ?? []).map((t: { id: string }) => t.id);
+  }
+
+  // Apply all filters + ordering to any base query
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const applyFilters = (base: any) => {
+    let q = base.or(`closes_at.gte.${today},closes_at.is.null`);
+    if (filters.specialty.length > 0) q = q.in("specialty", filters.specialty);
+    if (filters.grade.length > 0) q = q.in("grade", filters.grade);
+    if (filters.deanery.length > 0) {
+      const cities = filters.deanery.flatMap((d: string) => DEANERY_REGIONS[d] ?? []);
+      if (cities.length > 0)
+        q = q.or(cities.map((c: string) => `region.ilike.%${c}%`).join(","));
     }
-  }
+    if (filters.search) {
+      if (searchTrustIds.length > 0) {
+        q = q.or(
+          `title.ilike.%${filters.search}%,trust_id.in.(${searchTrustIds.join(",")})`,
+        );
+      } else {
+        q = q.ilike("title", `%${filters.search}%`);
+      }
+    }
+    if (sort === "posted_at") q = q.order("posted_at", { ascending: false });
+    else if (sort === "salary")
+      q = q.order("salary_max", { ascending: false, nullsFirst: false });
+    else q = q.order("closes_at", { ascending: true });
+    return q;
+  };
 
-  if (sort === "posted_at") {
-    query = query.order("posted_at", { ascending: false });
-  } else if (sort === "salary") {
-    query = query.order("salary_max", { ascending: false, nullsFirst: false });
-  } else {
-    query = query.order("closes_at", { ascending: true });
-  }
+  // Count total matching rows (PostgREST caps data responses at 1000 rows)
+  const { count: rawTotal } = await applyFilters(
+    supabase.from("job_listings").select("id", { count: "exact", head: true }),
+  );
+  const rowTotal = rawTotal ?? 0;
 
-  // Raise the PostgREST default 1000-row cap so dedup sees the full result set
-  query = query.limit(10000);
+  if (rowTotal === 0) return { jobs: [], total: 0 };
 
-  const { data, error } = await query;
+  // Fetch all rows in parallel 1000-row batches to bypass the PostgREST cap
+  const BATCH = 1000;
+  const DATA_SELECT = `
+    id, trust_id, title, specialty, grade, contract_type, region,
+    pay_band, salary_min, salary_max, on_call, training_post,
+    closes_at, posted_at, source, external_url,
+    trusts (name, avg_rating, review_count, type, cqc_overall)
+  `;
+  const results = await Promise.all(
+    Array.from({ length: Math.ceil(rowTotal / BATCH) }, (_, i) =>
+      applyFilters(supabase.from("job_listings").select(DATA_SELECT)).range(
+        i * BATCH,
+        Math.min((i + 1) * BATCH - 1, rowTotal - 1),
+      ),
+    ),
+  );
 
-  if (error) {
-    throw new Error(error.message);
-  }
+  const firstError = results.find((r: { error: unknown }) => r.error);
+  if (firstError?.error)
+    throw new Error((firstError.error as { message: string }).message);
 
-  const raw = (data ?? []) as unknown as DBJobListing[];
+  const raw = results.flatMap((r: { data: unknown[] | null }) => r.data ?? []) as unknown as DBJobListing[];
 
   // Deduplicate: NHS Jobs and Trac sometimes list the same vacancy.
   // Key on title + trust only — closes_at differs between sources for the same job.
