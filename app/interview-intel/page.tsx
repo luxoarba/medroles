@@ -59,7 +59,7 @@ export default async function InterviewIntelPage({
           <aside className="mb-8 lg:mb-0 lg:col-start-2 lg:row-start-1 lg:sticky lg:top-24">
             <div className="rounded-2xl bg-white p-6 ring-1 ring-gray-200">
               <h2 className="mb-1 text-base font-semibold text-gray-900">Share your experience</h2>
-              <p className="mb-5 text-xs text-gray-500">Anonymous — no account needed.</p>
+              <p className="mb-5 text-xs text-gray-500">Anonymous, no account needed.</p>
               <InterviewForm trusts={trusts ?? []} defaultTrustId={trust_id} />
             </div>
           </aside>
