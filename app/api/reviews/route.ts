@@ -7,7 +7,27 @@ const supabase = createClient(
 );
 
 // ── Regex: fast free checks before hitting the AI ──────────────────────────
+const PROFANITY = [
+  "fuck", "fucking", "fucked", "fucker", "fucks",
+  "shit", "shitting", "shitter", "bullshit",
+  "cunt", "cunts",
+  "bastard", "bastards",
+  "bitch", "bitches",
+  "asshole", "arsehole", "arse",
+  "dick", "dicks", "dickhead",
+  "cock", "cocks",
+  "piss", "pissed", "prick",
+  "twat", "twats",
+  "wanker", "wankers", "wank",
+];
+
+const PROFANITY_RE = new RegExp(
+  `\\b(${PROFANITY.join("|")})\\b`,
+  "i",
+);
+
 const PATTERNS: { re: RegExp; msg: string }[] = [
+  { re: PROFANITY_RE, msg: "Please keep your review professional — offensive language isn't allowed." },
   { re: /\b\d{3}[\s-]?\d{3}[\s-]?\d{4}\b/, msg: "Please remove NHS numbers from your review." },
   { re: /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/, msg: "Please remove email addresses from your review." },
   { re: /\b(07\d{9}|0[1-9]\d{8,9}|\+44[\s-]?\d{10})\b/, msg: "Please remove phone numbers from your review." },
