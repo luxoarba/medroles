@@ -1,10 +1,79 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { SPECIALTIES, GRADES } from "../lib/jobs";
 
 const RATINGS = [1, 2, 3, 4, 5];
+
+function TrustCombobox({
+  trusts,
+  value,
+  onChange,
+}: {
+  trusts: { id: string; name: string }[];
+  value: string;
+  onChange: (id: string) => void;
+}) {
+  const selected = trusts.find((t) => t.id === value) ?? null;
+  const [query, setQuery] = useState(selected?.name ?? "");
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const filtered = query.trim()
+    ? trusts.filter((t) => t.name.toLowerCase().includes(query.toLowerCase())).slice(0, 50)
+    : trusts.slice(0, 50);
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+        // If user typed but didn't pick, revert input to selected name
+        setQuery(selected?.name ?? "");
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [selected]);
+
+  function select(trust: { id: string; name: string }) {
+    onChange(trust.id);
+    setQuery(trust.name);
+    setOpen(false);
+  }
+
+  return (
+    <div ref={containerRef} className="relative">
+      <input
+        type="text"
+        value={query}
+        placeholder="Search trusts…"
+        onFocus={() => setOpen(true)}
+        onChange={(e) => {
+          setQuery(e.target.value);
+          setOpen(true);
+          if (!e.target.value) onChange("");
+        }}
+        className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
+      />
+      {open && filtered.length > 0 && (
+        <ul className="absolute z-50 mt-1 max-h-60 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+          {filtered.map((t) => (
+            <li
+              key={t.id}
+              onMouseDown={() => select(t)}
+              className={`cursor-pointer px-3 py-2 text-sm ${
+                t.id === value ? "bg-emerald-50 text-emerald-700 font-medium" : "text-gray-700 hover:bg-gray-50"
+              }`}
+            >
+              {t.name}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
 
 function StarPicker({
   label,
@@ -121,16 +190,7 @@ export default function ReviewForm({
         <label className="mb-1 block text-xs font-medium text-gray-700">
           Trust <span className="text-red-500">*</span>
         </label>
-        <select
-          value={trustId}
-          onChange={(e) => setTrustId(e.target.value)}
-          className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
-        >
-          <option value="">Select a trust…</option>
-          {trusts.map((t) => (
-            <option key={t.id} value={t.id}>{t.name}</option>
-          ))}
-        </select>
+        <TrustCombobox trusts={trusts} value={trustId} onChange={setTrustId} />
       </div>
 
       {/* Grade + Specialty */}

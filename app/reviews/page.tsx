@@ -39,7 +39,7 @@ export default async function ReviewsPage({
   const { trust_id } = await searchParams;
 
   const [{ data: trusts }, { data: reviews }, trustName] = await Promise.all([
-    supabase.from("trusts").select("id, name").order("name", { ascending: true }),
+    supabase.from("trusts").select("id, name").eq("is_nhs", true).order("name", { ascending: true }).limit(500),
     (trust_id
       ? supabase
           .from("trust_reviews")
