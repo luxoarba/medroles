@@ -54,6 +54,23 @@ export async function POST() {
     );
   }
 
+  // Apply same cooldown as GET to prevent triggering repeated scraper runs
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/job_listings?select=created_at&order=created_at.desc&limit=1`,
+      { headers: { apikey: ANON_KEY, Authorization: `Bearer ${ANON_KEY}` } },
+    );
+    const [latest] = await res.json();
+    if (latest?.created_at) {
+      const ageMs = Date.now() - new Date(latest.created_at).getTime();
+      if (ageMs < COOLDOWN_MS) {
+        return NextResponse.json({ skipped: true });
+      }
+    }
+  } catch {
+    // Proceed if check fails
+  }
+
   try {
     const [nhsRes, tracRes] = await Promise.all([
       callFunction("scrape-jobs"),

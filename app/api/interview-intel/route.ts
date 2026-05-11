@@ -6,6 +6,10 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!,
 );
 
+const VALID_SPECIALTIES = new Set(["Acute Medicine","Anaesthetics","Cardiology","Critical Care","Dermatology","Emergency Medicine","ENT","Gastroenterology","General Practice","General Surgery","Geriatric Medicine","Haematology","Neurology","Neurosurgery","Obstetrics & Gynaecology","Orthopaedics","Paediatrics","Plastic Surgery","Psychiatry","Radiology","Urology","Vascular Surgery"]);
+const VALID_GRADES = new Set(["FY1","FY2","CT1","CT2","ST3","ST4","ST5","ST6","Junior Clinical Fellow","Senior Clinical Fellow","SAS","Consultant"]);
+const VALID_FORMATS = new Set(["Panel interview","Portfolio-based","OSCE / clinical stations","Situational judgement","Presentation","Informal chat","Other"]);
+
 export async function POST(req: Request) {
   const body = await req.json().catch(() => null);
   if (!body) return NextResponse.json({ error: "Invalid JSON." }, { status: 400 });
@@ -17,6 +21,15 @@ export async function POST(req: Request) {
   }
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(trust_id)) {
     return NextResponse.json({ error: "Invalid trust_id." }, { status: 400 });
+  }
+  if (!VALID_SPECIALTIES.has(specialty)) {
+    return NextResponse.json({ error: "Invalid specialty." }, { status: 400 });
+  }
+  if (grade && !VALID_GRADES.has(grade)) {
+    return NextResponse.json({ error: "Invalid grade." }, { status: 400 });
+  }
+  if (format && !VALID_FORMATS.has(format)) {
+    return NextResponse.json({ error: "Invalid format." }, { status: 400 });
   }
   if (difficulty != null && ![1, 2, 3, 4, 5].includes(difficulty)) {
     return NextResponse.json({ error: "difficulty must be 1–5." }, { status: 400 });

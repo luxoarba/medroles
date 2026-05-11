@@ -8,8 +8,8 @@ const supabaseAdmin = createClient(
 
 export async function GET(req: NextRequest) {
   const token = req.nextUrl.searchParams.get("token");
-  if (!token) {
-    return new NextResponse("Missing token", { status: 400 });
+  if (!token || token.length > 200) {
+    return new NextResponse("Invalid token", { status: 400 });
   }
 
   const { error } = await supabaseAdmin

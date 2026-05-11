@@ -11,6 +11,10 @@ const resend = new Resend(process.env.RESEND_API_KEY!);
 const FROM = process.env.RESEND_FROM ?? "MedRoles <alerts@medroles.co.uk>";
 const BASE = "https://www.medroles.co.uk";
 
+function esc(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#x27;");
+}
+
 type Alert = {
   id: string;
   email: string;
@@ -103,10 +107,10 @@ function buildEmail(jobs: Job[], alert: Alert): string {
       return `
         <div style="border:1px solid #e5e7eb;border-radius:12px;padding:16px 20px;margin-bottom:12px">
           <p style="margin:0 0 4px;font-size:15px;font-weight:600;color:#111827">
-            <a href="${BASE}/jobs/${j.id}" style="color:#059669;text-decoration:none">${j.title}</a>
+            <a href="${BASE}/jobs/${j.id}" style="color:#059669;text-decoration:none">${esc(j.title)}</a>
           </p>
-          <p style="margin:0 0 6px;font-size:13px;color:#6b7280">${trustName}</p>
-          ${meta ? `<p style="margin:0;font-size:12px;color:#9ca3af">${meta}</p>` : ""}
+          <p style="margin:0 0 6px;font-size:13px;color:#6b7280">${esc(trustName)}</p>
+          ${meta ? `<p style="margin:0;font-size:12px;color:#9ca3af">${esc(meta)}</p>` : ""}
         </div>`;
     })
     .join("");
@@ -120,7 +124,7 @@ function buildEmail(jobs: Job[], alert: Alert): string {
       <p style="margin:4px 0 0;font-size:13px;color:#d1fae5">New NHS jobs matching your alert</p>
     </div>
     <div style="padding:24px 28px">
-      ${filterLine ? `<p style="margin:0 0 16px;font-size:13px;color:#6b7280">Alert: <strong>${filterLine}</strong></p>` : ""}
+      ${filterLine ? `<p style="margin:0 0 16px;font-size:13px;color:#6b7280">Alert: <strong>${esc(filterLine)}</strong></p>` : ""}
       <p style="margin:0 0 16px;font-size:14px;color:#374151">
         ${jobs.length} new job${jobs.length !== 1 ? "s" : ""} posted in the last 24 hours:
       </p>
