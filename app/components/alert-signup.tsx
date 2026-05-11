@@ -175,10 +175,6 @@ export default function AlertSignup() {
           {status === "loading" ? "Saving…" : "Notify me"}
         </button>
 
-        <p className="text-center text-[11px] text-gray-400">
-          Using an NHS email? Add{" "}
-          <span className="font-medium text-gray-500">alerts@medroles.co.uk</span> to your safe senders to ensure delivery.
-        </p>
       </form>
     </div>
   );

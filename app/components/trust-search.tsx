@@ -89,8 +89,10 @@ export default function TrustSearch({ trusts }: { trusts: Trust[] }) {
                     {TYPE_LABELS[trust.type] ?? trust.type}
                   </span>
                 )}
-                {trust.avg_rating !== null && (
+                {trust.avg_rating !== null && trust.review_count && trust.review_count > 0 ? (
                   <StarRating rating={trust.avg_rating} />
+                ) : (
+                  <span className="text-[11px] text-gray-400">No rating yet</span>
                 )}
               </div>
             </div>

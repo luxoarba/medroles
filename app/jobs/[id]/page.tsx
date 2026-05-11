@@ -108,7 +108,7 @@ export default async function JobDetailPage({
 
   const { data: job } = await supabase
     .from("job_listings")
-    .select("*, trusts(name, avg_rating, review_count, type, cqc_overall)")
+    .select("*, created_at, trusts(name, avg_rating, review_count, type, cqc_overall)")
     .eq("id", id)
     .single<DBJobListing>();
 
@@ -153,16 +153,17 @@ export default async function JobDetailPage({
       )
     : null;
 
-  const postedRelative = job.posted_at
+  const postedSource = job.posted_at ?? job.created_at;
+  const postedRelative = postedSource
     ? (() => {
         const days = Math.round(
-          (Date.now() - new Date(job.posted_at).getTime()) / (1000 * 60 * 60 * 24),
+          (Date.now() - new Date(postedSource).getTime()) / (1000 * 60 * 60 * 24),
         );
         if (days === 0) return "Today";
         if (days === 1) return "Yesterday";
         if (days < 7) return `${days} days ago`;
         if (days < 60) return `${Math.round(days / 7)} weeks ago`;
-        return new Date(job.posted_at).toLocaleDateString("en-GB", {
+        return new Date(postedSource).toLocaleDateString("en-GB", {
           day: "numeric",
           month: "short",
         });
@@ -260,11 +261,6 @@ export default async function JobDetailPage({
                         {job.specialty}
                       </span>
                     )}
-                    {job.contract_type && (
-                      <span className="rounded-md bg-gray-50 px-2.5 py-1 text-xs font-semibold text-gray-600 ring-1 ring-gray-200">
-                        {job.contract_type}
-                      </span>
-                    )}
                     {job.training_post === true && (
                       <span className="rounded-md bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200">
                         Training post
@@ -301,29 +297,13 @@ export default async function JobDetailPage({
               </div>
 
               {/* Key details grid */}
-              <div className="grid grid-cols-2 gap-4 rounded-xl bg-gray-50 p-5 sm:grid-cols-4">
+              <div className="grid grid-cols-2 gap-4 rounded-xl bg-gray-50 p-5">
                 <div>
                   <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">
                     Salary
                   </p>
                   <p className="mt-1 text-sm font-semibold text-gray-800">
                     {formatSalary(job.salary_min, job.salary_max) ?? "—"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">
-                    Training post
-                  </p>
-                  <p className="mt-1 text-sm font-semibold text-gray-800">
-                    {job.training_post === null ? "Unknown" : job.training_post ? "Yes" : "No"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">
-                    Trust type
-                  </p>
-                  <p className="mt-1 text-sm font-semibold text-gray-800">
-                    {trust?.type ?? "—"}
                   </p>
                 </div>
                 <div>
@@ -338,7 +318,7 @@ export default async function JobDetailPage({
             </div>
 
             {/* Description */}
-            {job.description && (
+            {job.description ? (
               <div className="mb-6 rounded-2xl bg-white p-8 ring-1 ring-gray-200">
                 <h2 className="mb-4 text-base font-semibold text-gray-900">
                   About the role
@@ -353,7 +333,25 @@ export default async function JobDetailPage({
                     ))}
                 </div>
               </div>
-            )}
+            ) : job.external_url ? (
+              <div className="mb-6 rounded-2xl bg-white p-8 ring-1 ring-gray-200">
+                <h2 className="mb-4 text-base font-semibold text-gray-900">About the role</h2>
+                <p className="text-sm text-gray-500">
+                  Full job details are available on the original listing.
+                </p>
+                <a
+                  href={job.external_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-emerald-600 hover:text-emerald-700 transition-colors"
+                >
+                  View full description on {job.source}
+                  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+                  </svg>
+                </a>
+              </div>
+            ) : null}
 
             {/* Person specification */}
             {((job.requirements && job.requirements.length > 0) || (job.benefits && job.benefits.length > 0)) && (

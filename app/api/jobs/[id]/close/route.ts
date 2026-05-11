@@ -1,11 +1,14 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { createHmac, timingSafeEqual } from "crypto";
+import { Resend } from "resend";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!,
 );
+
+const resend = new Resend(process.env.RESEND_API_KEY!);
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -33,18 +36,32 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  const closedDate = yesterday.toISOString().slice(0, 10);
-
-  const { error } = await supabase
+  const { data: job } = await supabase
     .from("job_listings")
-    .update({ closes_at: closedDate })
-    .eq("id", id);
+    .select("title, trusts(name)")
+    .eq("id", id)
+    .single();
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
+  const trustRaw = job?.trusts;
+  const trustName = Array.isArray(trustRaw) ? trustRaw[0]?.name : (trustRaw as { name: string } | null | undefined)?.name;
+
+  const jobUrl = `https://www.medroles.co.uk/jobs/${id}`;
+
+  await resend.emails.send({
+    from: "MedRoles <alerts@medroles.co.uk>",
+    to: "hello@medroles.co.uk",
+    subject: `Job reported as filled: ${job?.title ?? id}`,
+    text: [
+      "A user has reported the following job as filled:",
+      "",
+      `Title: ${job?.title ?? "Unknown"}`,
+      `Trust: ${trustName ?? "Unknown"}`,
+      `Job ID: ${id}`,
+      `URL: ${jobUrl}`,
+      "",
+      "Please verify and remove it from listings if confirmed.",
+    ].join("\n"),
+  });
 
   return NextResponse.json({ ok: true });
 }

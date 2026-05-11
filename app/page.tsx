@@ -43,7 +43,7 @@ async function fetchGradeCounts(): Promise<Record<string, number>> {
         .from("job_listings")
         .select("*", { count: "exact", head: true })
         .in("grade", grades)
-        .gte("closes_at", today)
+        .or(`closes_at.gte.${today},closes_at.is.null`)
         .then(({ count }) => [key, count ?? 0] as [string, number]),
     ),
   );
@@ -51,10 +51,11 @@ async function fetchGradeCounts(): Promise<Record<string, number>> {
 }
 
 async function fetchStats() {
-  const [{ data: jobCountRaw }, { data: reviews }] =
+  const [{ data: jobCountRaw }, { data: reviews }, { count: trustCount }] =
     await Promise.all([
       supabase.rpc("live_job_count"),
       supabase.from("trust_reviews").select("overall_rating"),
+      supabase.from("trusts").select("*", { count: "exact", head: true }).eq("is_nhs", true),
     ]);
   const jobCount = (jobCountRaw as number) ?? 0;
   const reviewCount = reviews?.length ?? 0;
@@ -62,7 +63,7 @@ async function fetchStats() {
     reviewCount > 0
       ? reviews!.reduce((s, r) => s + r.overall_rating, 0) / reviewCount
       : null;
-  return { jobCount, reviewCount, avgRating };
+  return { jobCount, reviewCount, avgRating, trustCount: trustCount ?? 0 };
 }
 
 export default async function Home() {
@@ -139,28 +140,32 @@ export default async function Home() {
             <p className="text-4xl font-bold tabular-nums text-gray-900">
               <span className="text-emerald-600">{stats.jobCount.toLocaleString("en-GB")}</span>
             </p>
-            <p className="mt-1 text-sm text-gray-500">live roles</p>
+            <p className="mt-1 text-sm text-gray-500">All NHS live roles</p>
+          </div>
+          <div className="hidden h-12 w-px bg-gray-200 lg:block" />
+          <div className="text-center">
+            <p className="text-4xl font-bold tabular-nums text-gray-900">
+              <span className="text-emerald-600">{stats.trustCount}</span>
+            </p>
+            <p className="mt-1 text-sm text-gray-500">NHS trusts</p>
           </div>
           <div className="hidden h-12 w-px bg-gray-200 lg:block" />
           <div className="text-center">
             <p className="text-4xl font-bold text-gray-900">
-              <span className="text-emerald-600">All</span>
+              <svg className="mx-auto h-9 w-9 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.562.562 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z" />
+              </svg>
             </p>
-            <p className="mt-1 text-sm text-gray-500">NHS live roles</p>
+            <p className="mt-1 text-sm text-gray-500">Real doctor reviews</p>
           </div>
           <div className="hidden h-12 w-px bg-gray-200 lg:block" />
           <div className="text-center">
-            <p className="text-4xl font-bold tabular-nums text-gray-900">
-              <span className="text-emerald-600">{stats.reviewCount}</span>
+            <p className="text-4xl font-bold text-gray-900">
+              <svg className="mx-auto h-9 w-9 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
             </p>
-            <p className="mt-1 text-sm text-gray-500">doctor reviews</p>
-          </div>
-          <div className="hidden h-12 w-px bg-gray-200 lg:block" />
-          <div className="text-center">
-            <p className="text-4xl font-bold tabular-nums text-gray-900">
-              <span className="text-emerald-600">30min</span>
-            </p>
-            <p className="mt-1 text-sm text-gray-500">update frequency</p>
+            <p className="mt-1 text-sm text-gray-500">Always up to date</p>
           </div>
         </div>
       </section>

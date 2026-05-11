@@ -52,7 +52,7 @@ export default function NavbarAuth() {
   return (
     <Link
       href="/auth"
-      className="hidden text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors sm:block px-3 py-2"
+      className="hidden rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700 transition-colors sm:block"
     >
       Sign in
     </Link>

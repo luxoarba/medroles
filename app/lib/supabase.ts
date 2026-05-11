@@ -20,6 +20,7 @@ export type DBJobListing = {
   training_post: boolean | null;
   closes_at: string | null;
   posted_at: string | null;
+  created_at: string | null;
   source: string | null;
   external_url: string | null;
   trusts:

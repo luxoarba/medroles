@@ -3,12 +3,26 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import type { User } from "@supabase/supabase-js";
+import { signOut, subscribeToAuthChanges } from "@/lib/auth";
 
 export default function MobileNavDrawer() {
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
   const pathname = usePathname();
+  const router = useRouter();
+
+  useEffect(() => {
+    const sub = subscribeToAuthChanges((_, session) => setUser(session?.user ?? null));
+    return () => sub.unsubscribe();
+  }, []);
+
+  async function handleSignOut() {
+    await signOut();
+    router.refresh();
+  }
 
   useEffect(() => { setMounted(true); }, []);
 
@@ -86,19 +100,46 @@ export default function MobileNavDrawer() {
           })}
         </nav>
 
-        {/* Sign in */}
+        {/* Auth */}
         <div style={{ borderTop: "1px solid #f3f4f6", padding: "12px" }}>
-          <Link
-            href="/auth"
-            style={{
-              display: "flex", alignItems: "center",
-              padding: "12px 16px", borderRadius: "12px",
-              fontSize: "15px", fontWeight: 500, textDecoration: "none",
-              color: "#374151",
-            }}
-          >
-            Sign in / My account
-          </Link>
+          {user ? (
+            <>
+              <Link
+                href="/account"
+                style={{
+                  display: "flex", alignItems: "center",
+                  padding: "12px 16px", borderRadius: "12px",
+                  fontSize: "15px", fontWeight: 500, textDecoration: "none",
+                  color: "#374151", marginBottom: "4px",
+                }}
+              >
+                My account
+              </Link>
+              <button
+                onClick={handleSignOut}
+                style={{
+                  display: "flex", alignItems: "center", width: "100%",
+                  padding: "12px 16px", borderRadius: "12px", border: "none", background: "none",
+                  fontSize: "15px", fontWeight: 500, cursor: "pointer",
+                  color: "#dc2626",
+                }}
+              >
+                Sign out
+              </button>
+            </>
+          ) : (
+            <Link
+              href="/auth"
+              style={{
+                display: "flex", alignItems: "center",
+                padding: "12px 16px", borderRadius: "12px",
+                fontSize: "15px", fontWeight: 500, textDecoration: "none",
+                color: "#059669",
+              }}
+            >
+              Sign in
+            </Link>
+          )}
         </div>
       </div>
     </div>

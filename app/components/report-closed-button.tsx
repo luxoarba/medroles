@@ -24,13 +24,13 @@ export default function ReportClosedButton({ jobId, token }: { jobId: string; to
   }
 
   if (state === "done") {
-    return <p className="text-center text-xs text-gray-400">Thanks — this role has been marked as filled.</p>;
+    return <p className="text-center text-xs text-gray-400">Thanks — we'll check and remove it if it's been filled.</p>;
   }
 
   if (state === "confirming" || state === "loading") {
     return (
       <div className="text-center">
-        <p className="mb-2 text-xs text-gray-500">Mark this role as filled? It will be removed from listings.</p>
+        <p className="mb-2 text-xs text-gray-500">Report this role as filled? We'll review and remove it if confirmed.</p>
         <div className="flex justify-center gap-2">
           <button
             type="button"
@@ -58,7 +58,7 @@ export default function ReportClosedButton({ jobId, token }: { jobId: string; to
       onClick={() => setState("confirming")}
       className="block w-full text-center text-xs text-gray-400 hover:text-gray-600 transition-colors"
     >
-      This role has been filled?
+      Has this role been filled? Report it →
     </button>
   );
 }
