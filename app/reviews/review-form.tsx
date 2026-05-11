@@ -177,6 +177,16 @@ export default function ReviewForm({
           placeholder="What was it like working here? How was the team, workload, support for training…"
           className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 resize-none"
         />
+        <p className="mt-1.5 text-[11px] text-gray-400">
+          Do not include names of colleagues or patients, patient details, or contact information.
+        </p>
+      </div>
+
+      {/* Privacy notice */}
+      <div className="rounded-lg bg-gray-50 px-4 py-3 ring-1 ring-gray-100">
+        <p className="text-[11px] leading-relaxed text-gray-500">
+          <span className="font-semibold text-gray-600">Your anonymity is protected.</span> Reviews are stored without any account, email, or IP address linked to them. Your grade and specialty are optional — omit them if your role is distinctive enough to identify you.
+        </p>
       </div>
 
       {error && <p className="text-sm text-red-600">{error}</p>}
