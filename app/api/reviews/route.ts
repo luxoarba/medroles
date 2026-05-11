@@ -59,17 +59,26 @@ async function moderateWithClaude(text: string): Promise<{ safe: boolean; reason
         messages: [
           {
             role: "user",
-            content: `You moderate anonymous workplace reviews on an NHS job board for doctors. Check this text for:
-1. Full names of specific people (patients, colleagues, managers)
-2. Patient-identifiable information (dates of birth, addresses, clinical case details)
-3. Profanity or abusive language directed at named individuals
-4. Contact details (emails, phone numbers, GMC numbers)
+            content: `You moderate anonymous workplace reviews on an NHS job board for doctors. Your job is to protect patient and colleague privacy.
+
+Flag the text if it contains ANY of the following:
+1. Any name used to refer to a patient — this includes first names only ("Mr John"), titles with names ("Dr Smith"), or partial names. Even a single name is enough to flag if it appears to identify a patient.
+2. Any name used to refer to a specific colleague, manager, or named individual in a way that could identify them.
+3. Patient-identifiable details: dates of birth, hospital numbers, addresses, specific diagnoses linked to a person, case descriptions that could identify someone.
+4. Contact details: emails, phone numbers, GMC numbers, NMC numbers.
+
+Do NOT flag:
+- General descriptions of working conditions, rota, training, culture
+- Mentions of departments, wards, or specialties without naming individuals
+- Critical but professional opinions about a trust or department
+
+When in doubt, flag it. Privacy protection is the priority.
 
 Reply with JSON only — no other text.
 If acceptable: {"safe":true}
-If not: {"safe":false,"reason":"one short sentence telling the user what to remove"}
+If not: {"safe":false,"reason":"one short sentence telling the user exactly what to remove"}
 
-Text:
+Text to review:
 ${text}`,
           },
         ],
