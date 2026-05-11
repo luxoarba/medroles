@@ -85,13 +85,23 @@ ${text}`,
       }),
     });
 
-    if (!res.ok) return { safe: true, reason: null };
+    if (!res.ok) {
+      const errBody = await res.text().catch(() => "(unreadable)");
+      console.error("[moderation] Anthropic API error", res.status, errBody);
+      return { safe: true, reason: null };
+    }
 
     const data = await res.json();
     const raw: string = data?.content?.[0]?.text ?? "{}";
-    return JSON.parse(raw);
-  } catch {
-    // If moderation fails, let the review through rather than block legitimate submissions
+    console.log("[moderation] Claude response:", raw);
+    try {
+      return JSON.parse(raw);
+    } catch {
+      console.error("[moderation] Failed to parse Claude response:", raw);
+      return { safe: true, reason: null };
+    }
+  } catch (err) {
+    console.error("[moderation] Fetch failed:", err);
     return { safe: true, reason: null };
   }
 }
