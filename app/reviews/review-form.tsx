@@ -4,6 +4,36 @@ import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { SPECIALTIES, GRADES } from "../lib/jobs";
 
+function PrivacyDisclosure({ itemLabel }: { itemLabel: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="flex justify-end">
+      <div className="relative">
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          className="flex items-center gap-1.5 rounded-full border border-gray-200 bg-white px-2.5 py-1 text-[11px] font-medium text-gray-500 hover:border-emerald-300 hover:text-emerald-700 transition-colors"
+        >
+          <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+          </svg>
+          Anonymous
+          <svg className={`h-3 w-3 transition-transform ${open ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+          </svg>
+        </button>
+        {open && (
+          <div className="absolute right-0 top-8 z-10 w-72 rounded-xl border border-gray-200 bg-white p-4 shadow-lg">
+            <p className="text-[11px] leading-relaxed text-gray-500">
+              <span className="font-semibold text-gray-700">Your anonymity is protected.</span> {itemLabel} are stored without any account, email or IP address linked to them. Your grade and specialty are optional, omit them if your role is distinctive enough to identify you.
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 const RATINGS = [1, 2, 3, 4, 5];
 
 function TrustCombobox({
@@ -185,6 +215,8 @@ export default function ReviewForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
+      <PrivacyDisclosure itemLabel="Reviews" />
+
       {/* Trust */}
       <div>
         <label className="mb-1 block text-xs font-medium text-gray-700">
@@ -242,17 +274,9 @@ export default function ReviewForm({
         </p>
       </div>
 
-      {/* Privacy notice */}
-      <div className="rounded-lg bg-gray-50 px-4 py-3 ring-1 ring-gray-100">
-        <p className="text-[11px] leading-relaxed text-gray-500">
-          <span className="font-semibold text-gray-600">Your anonymity is protected.</span> Reviews are stored without any account, email, or IP address linked to them. Your grade and specialty are optional — omit them if your role is distinctive enough to identify you.
-        </p>
-      </div>
-
       {error && <p className="text-sm text-red-600">{error}</p>}
 
-      <div className="flex items-center justify-between">
-        <p className="text-xs text-gray-400">Completely anonymous — no account needed.</p>
+      <div className="flex justify-end">
         <button
           type="submit"
           disabled={status === "submitting"}
