@@ -93,9 +93,9 @@ ${text}`,
 
     const data = await res.json();
     const raw: string = data?.content?.[0]?.text ?? "{}";
-    console.log("[moderation] Claude response:", raw);
+    const cleaned = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
     try {
-      return JSON.parse(raw);
+      return JSON.parse(cleaned);
     } catch {
       console.error("[moderation] Failed to parse Claude response:", raw);
       return { safe: true, reason: null };
