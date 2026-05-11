@@ -244,8 +244,8 @@ function normaliseGrade(raw: string | null): string | null {
   const t = raw.toLowerCase();
   if (/\bfy1\b/.test(t)) return "FY1";
   if (/\bfy2\b/.test(t)) return "FY2";
-  if (/\bct1\b/.test(t)) return "CT1";
-  if (/\bct2\b/.test(t)) return "CT2";
+  if (/\bct1\b|\bst1\b/.test(t)) return "CT1";
+  if (/\bct2\b|\bst2\b/.test(t)) return "CT2";
   if (/\bst[3-9]\b/.test(t)) {
     const m = t.match(/st([3-9])/);
     const n = m ? parseInt(m[1]) : 6;
@@ -284,8 +284,8 @@ function inferGrade(title: string): string | null {
   const t = title.toLowerCase();
   if (/\bfy1\b|foundation year 1|foundation doctor 1|resident doctor year 1/.test(t)) return "FY1";
   if (/\bfy2\b|foundation year 2|foundation doctor 2|resident doctor year 2/.test(t)) return "FY2";
-  if (/\bct1\b|core trainee 1/.test(t)) return "CT1";
-  if (/\bct2\b|core trainee 2/.test(t)) return "CT2";
+  if (/\bct1\b|core trainee 1|\bst1\b/.test(t)) return "CT1";
+  if (/\bct2\b|core trainee 2|\bst2\b/.test(t)) return "CT2";
   if (/\bst3\b/.test(t)) return "ST3";
   if (/\bst4\b/.test(t)) return "ST4";
   if (/\bst5\b/.test(t)) return "ST5";
@@ -305,11 +305,11 @@ function isDoctorRole(title: string): boolean {
     /\bresident doctor\b/.test(t) ||
     /\bjunior doctor\b/.test(t) ||
     /\bct[12]\b|core trainee|core surgical trainee|core medical trainee|core training\b/.test(t) ||
-    /\bst[3-9]\b|specialty trainee|specialty registrar/.test(t) ||
+    /\bst[1-9]\b|special(?:t|it)y trainee|special(?:t|it)y registrar/.test(t) ||
     /\bimt\b|internal medicine trainee/.test(t) ||
     /\bassociate specialist\b/.test(t) ||
     /\bstaff grade\b/.test(t) ||
-    /\bspecialty doctor\b/.test(t) ||
+    /\bspecial(?:t|it)y doctor\b/.test(t) ||
     /\bsas doctor\b/.test(t) ||
     /\btrust grade\b/.test(t) ||
     /\blocum\b/.test(t) ||
@@ -317,7 +317,8 @@ function isDoctorRole(title: string): boolean {
     /\bhouse officer\b/.test(t) ||
     /\bgp\b|\bgpst\b|\bgeneral practitioner\b/.test(t) ||
     /\bmedical officer\b/.test(t) ||
-    /\bclinical fellow\b/.test(t) ||
+    /\blocally employed doctor\b/.test(t) ||
+    /\b(?:academic )?clinical (?:research )?fellow\b/.test(t) ||
     /\bmedical fellow\b/.test(t) ||
     /\bphysician\b/.test(t)
   );
