@@ -252,7 +252,7 @@ export default function ReviewForm({
       </div>
 
       {/* Ratings */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4">
         <StarPicker label="Overall *" value={overall} onChange={setOverall} />
         <StarPicker label="Training" value={training} onChange={setTraining} />
         <StarPicker label="Rota" value={rota} onChange={setRota} />
