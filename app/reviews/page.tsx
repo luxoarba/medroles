@@ -136,7 +136,7 @@ export default async function ReviewsPage({
                         <span className="text-xs text-gray-400">{date}</span>
                       </div>
 
-                      <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                      <div className="mb-3 grid grid-cols-2 gap-2">
                         {[
                           { label: "Overall", val: r.overall_rating },
                           { label: "Training", val: r.training_rating },
