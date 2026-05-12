@@ -8,7 +8,7 @@ const supabase = createClient(
 const BASE_URL = "https://www.healthjobsuk.com";
 const LIST_PATH = "/job_list/Medical_and_Dental";
 const SAFETY_PAGE_CAP = 200; // confirmed 137 pages as of Apr 2026; 200 gives headroom
-const LIST_DELAY_MS = 150;
+const LIST_DELAY_MS = 50;
 const DETAIL_CONCURRENCY = 3; // low concurrency to reduce Cloudflare challenge rate
 const MAX_DETAIL_FETCHES = 300; // per run — prioritise unenriched jobs, same pattern as scrape-jobs
 
@@ -397,7 +397,7 @@ async function resolveTrusts(names: string[]): Promise<Map<string, string>> {
 
 // --- Fetch helpers ---
 
-const HEADERS = {
+const BASE_HEADERS: Record<string, string> = {
   "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
   "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
   "Accept-Language": "en-GB,en;q=0.9",
@@ -405,16 +405,45 @@ const HEADERS = {
   "Cache-Control": "no-cache",
 };
 
+// Session cookies captured from list page fetches, forwarded to detail pages.
+// Cloudflare's __cf_bm cookie is set after evaluating the list page request;
+// including it in detail page requests signals they belong to the same session.
+let sessionCookies = "";
+
+function parseCookies(res: Response): string {
+  // Deno's Headers.get("set-cookie") returns only the first value.
+  // Use getSetCookie() (available in Deno 1.38+) when multiple cookies are set.
+  const raw: string[] = typeof (res.headers as unknown as { getSetCookie?: () => string[] }).getSetCookie === "function"
+    ? (res.headers as unknown as { getSetCookie: () => string[] }).getSetCookie()
+    : res.headers.get("set-cookie") ? [res.headers.get("set-cookie")!] : [];
+  return raw.map((c) => c.split(";")[0]).filter(Boolean).join("; ");
+}
+
 async function fetchPage(page: number): Promise<string> {
   const url = `${BASE_URL}${LIST_PATH}?_pg=${page}`;
-  const res = await fetch(url, { headers: HEADERS });
+  const headers: Record<string, string> = {
+    ...BASE_HEADERS,
+    ...(sessionCookies ? { Cookie: sessionCookies } : {}),
+  };
+  const res = await fetch(url, { headers });
   if (!res.ok) throw new Error(`Trac Jobs page ${page} returned ${res.status}`);
+  const cookies = parseCookies(res);
+  if (cookies) sessionCookies = cookies;
   return res.text();
 }
 
 async function fetchDetail(url: string): Promise<DetailData | null> {
   try {
-    const res = await fetch(url, { headers: HEADERS });
+    const headers: Record<string, string> = {
+      ...BASE_HEADERS,
+      // Mimic a browser navigating from the list page to a detail page
+      "Referer": `${BASE_URL}${LIST_PATH}`,
+      "Sec-Fetch-Site": "same-origin",
+      "Sec-Fetch-Mode": "navigate",
+      "Sec-Fetch-Dest": "document",
+      ...(sessionCookies ? { Cookie: sessionCookies } : {}),
+    };
+    const res = await fetch(url, { headers });
     if (!res.ok) return null;
     const html = await res.text();
     // Cloudflare challenge pages return 200 OK but contain no job content.
@@ -425,6 +454,7 @@ async function fetchDetail(url: string): Promise<DetailData | null> {
       html.includes("Enable JavaScript and cookies to continue") ||
       html.includes("Completing the CAPTCHA")
     ) {
+      console.log(`CF challenge on: ${url}`);
       return null;
     }
     return parseDetailPage(html);
@@ -454,6 +484,7 @@ Deno.serve(async () => {
 
   try {
     const firstHtml = await fetchPage(1);
+    console.log(`session cookies after page 1: ${sessionCookies ? sessionCookies.substring(0, 80) + "…" : "none"}`);
     const totalPages = parseTotalPages(firstHtml);
     const allParsed: ParsedJob[] = parseJobCards(firstHtml);
 
@@ -522,6 +553,29 @@ Deno.serve(async () => {
       .from("job_listings")
       .upsert(basicRows, { onConflict: "external_url", ignoreDuplicates: true });
     stats.upserted = basicRows.length;
+
+    // Cleanup: delete Trac jobs no longer on the live listing.
+    // Runs before Phase 2 so it completes even if detail enrichment times out.
+    // Guard: only run if we got a full-looking scrape (>=400 doctor jobs).
+    if (doctorJobs.length >= 400) {
+      const liveUrlSet = new Set(doctorJobs.map((j) => j.externalUrl));
+      const { data: dbRows } = await supabase
+        .from("job_listings")
+        .select("external_url")
+        .eq("source", "Trac Jobs");
+      const deadUrls = (dbRows ?? [])
+        .map((r: { external_url: string }) => r.external_url)
+        .filter((url: string) => !liveUrlSet.has(url));
+      if (deadUrls.length > 0) {
+        const { count } = await supabase
+          .from("job_listings")
+          .delete({ count: "exact" })
+          .eq("source", "Trac Jobs")
+          .in("external_url", deadUrls);
+        stats.deleted = count ?? 0;
+        console.log(`deleted ${stats.deleted} stale Trac jobs`);
+      }
+    }
 
     // Phase 2: enrich with detail pages (best-effort — timeout here is acceptable).
     // Priority: (1) no closing date yet, (2) no requirements yet, (3) fully enriched (refresh).
@@ -606,14 +660,6 @@ Deno.serve(async () => {
       }
     }
 
-    // Delete Trac jobs no longer live on the site (based on ALL doctor jobs, not just enriched)
-    const liveUrls = doctorJobs.map((j) => j.externalUrl);
-    const { count } = await supabase
-      .from("job_listings")
-      .delete({ count: "exact" })
-      .eq("source", "Trac Jobs")
-      .not("external_url", "in", `(${liveUrls.map((u) => `"${u}"`).join(",")})`);
-    stats.deleted = count ?? 0;
   } catch (e) {
     return new Response(JSON.stringify({ error: String(e) }), {
       status: 500,
